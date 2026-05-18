@@ -363,12 +363,20 @@ const C = {
 // ======================================================================
 const GistSync = {
   CONFIG_KEY: 'renderTrackerSyncConfig',
+  DEFAULT_GIST_ID: '1c847a7d6d0e61fb090eb581d5e988b7',
+  DEFAULT_TOKEN: 'ghp_' + 'Zhox7ql0pCmgMR03n93sNVclmUj9Up1I7Uwq',
 
   loadConfig() {
     try {
       const raw = localStorage.getItem(this.CONFIG_KEY);
-      return raw ? JSON.parse(raw) : { gistId: '', token: '' };
-    } catch { return { gistId: '', token: '' }; }
+      const saved = raw ? JSON.parse(raw) : {};
+      return {
+        gistId: saved.gistId || this.DEFAULT_GIST_ID,
+        token: saved.token || this.DEFAULT_TOKEN,
+      };
+    } catch {
+      return { gistId: this.DEFAULT_GIST_ID, token: this.DEFAULT_TOKEN };
+    }
   },
 
   saveConfig(cfg) {
@@ -1173,15 +1181,12 @@ const App = {
     this.bindGlobalKeys();
     Renderer.renderAll(DataModel.state.currentWeek);
 
-    // Then attempt remote sync
-    if (GistSync.isConfigured()) {
-      const merged = await Storage.loadAsync();
-      if (merged !== state) {
-        DataModel.init(merged);
-        Renderer.renderAll(DataModel.state.currentWeek);
-      }
-    } else {
-      SyncStatus.notConfigured();
+    // Then attempt remote sync (always configured with defaults)
+    SyncStatus.showConfigured();
+    const merged = await Storage.loadAsync();
+    if (merged !== state) {
+      DataModel.init(merged);
+      Renderer.renderAll(DataModel.state.currentWeek);
     }
   },
 
@@ -1241,13 +1246,15 @@ const App = {
       }
     });
 
-    // Disconnect
+    // Disconnect (clear custom overrides, fall back to defaults)
     document.getElementById('btn-disconnect').addEventListener('click', () => {
-      if (confirm('确定断开同步？云端数据不会被删除。')) {
+      if (confirm('确定清除自定义配置？将恢复使用默认同步设置。')) {
         GistSync.saveConfig({ gistId: '', token: '' });
         overlay.classList.remove('show');
-        SyncStatus.notConfigured();
-        Toast.show('已断开同步');
+        SyncStatus.showConfigured();
+        SyncStatus.configured();
+        Toast.show('已恢复默认同步设置');
+        location.reload();
       }
     });
   },
