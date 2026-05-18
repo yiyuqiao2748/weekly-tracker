@@ -304,6 +304,40 @@ body {
 #settings-dialog button.danger { color: #e00; border-color: transparent; background: transparent; }
 #settings-dialog button.danger:hover { background: #fee; }
 
+/* ===== Save Bar ===== */
+#save-bar {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  padding: 10px 0 14px; z-index: 200;
+  pointer-events: none;
+}
+#btn-save {
+  pointer-events: auto;
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  padding: 10px 32px; border-radius: 24px;
+  border: none; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+#btn-save .save-icon { font-size: 16px; }
+#btn-save.saved {
+  background: #e8f5e9; color: #4caf50;
+}
+#btn-save.saving {
+  background: #fff3e0; color: #f59e0b;
+}
+#btn-save.unsaved {
+  background: #1a73e8; color: #fff;
+  animation: save-pulse 1.5s infinite;
+}
+#btn-save.error {
+  background: #fce4ec; color: #e53935;
+}
+@keyframes save-pulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(26,115,232,0.3); }
+  50% { box-shadow: 0 4px 32px rgba(26,115,232,0.6); }
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 1000px) { #board { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px)  { #board { grid-template-columns: 1fr; } }
@@ -325,6 +359,13 @@ body {
 
 <div id="toast"></div>
 <div id="board"></div>
+
+<div id="save-bar">
+  <button type="button" id="btn-save" class="saved">
+    <span class="save-icon">✓</span>
+    <span class="save-text">已保存</span>
+  </button>
+</div>
 
 <div id="settings-overlay">
   <div id="settings-dialog">
@@ -454,12 +495,59 @@ const GistSync = {
   pushDebounced(state) {
     if (!this.isConfigured()) return;
     clearTimeout(this._pushTimer);
-    this._pushTimer = setTimeout(async () => {
-      SyncStatus.syncing();
-      const ok = await this.push(state);
-      if (ok) SyncStatus.configured();
-      else SyncStatus.error('同步失败');
-    }, 3000);
+    SaveBtn.setUnsaved();
+    this._pushTimer = setTimeout(() => this._doPush(state), 3000);
+  },
+
+  // Immediate push (called by save button)
+  async saveNow(state) {
+    if (!this.isConfigured()) return false;
+    clearTimeout(this._pushTimer);
+    return await this._doPush(state);
+  },
+
+  async _doPush(state) {
+    SaveBtn.setSaving();
+    SyncStatus.syncing();
+    const ok = await this.push(state);
+    if (ok) {
+      SaveBtn.setSaved();
+      SyncStatus.configured();
+    } else {
+      SaveBtn.setError();
+      SyncStatus.error('同步失败');
+    }
+    return ok;
+  },
+};
+
+// ======================================================================
+// SaveBtn — Floating save button at bottom center
+// ======================================================================
+const SaveBtn = {
+  setSaved() {
+    const btn = document.getElementById('btn-save');
+    btn.className = 'saved';
+    btn.querySelector('.save-icon').textContent = '✓';
+    btn.querySelector('.save-text').textContent = '已保存';
+  },
+  setUnsaved() {
+    const btn = document.getElementById('btn-save');
+    btn.className = 'unsaved';
+    btn.querySelector('.save-icon').textContent = '↑';
+    btn.querySelector('.save-text').textContent = '点击保存到云端';
+  },
+  setSaving() {
+    const btn = document.getElementById('btn-save');
+    btn.className = 'saving';
+    btn.querySelector('.save-icon').textContent = '⏳';
+    btn.querySelector('.save-text').textContent = '保存中...';
+  },
+  setError() {
+    const btn = document.getElementById('btn-save');
+    btn.className = 'error';
+    btn.querySelector('.save-icon').textContent = '↻';
+    btn.querySelector('.save-text').textContent = '同步失败 — 点击重试';
   },
 };
 
@@ -1179,6 +1267,7 @@ const App = {
     this.bindBoardDelegation();
     this.bindSettings();
     this.bindGlobalKeys();
+    this.bindSaveBtn();
     Renderer.renderAll(DataModel.state.currentWeek);
 
     // Then attempt remote sync (always configured with defaults)
@@ -1272,6 +1361,17 @@ const App = {
           document.getElementById('settings-overlay').classList.remove('show');
         }
       }
+      // Ctrl+S: manual save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        GistSync.saveNow(DataModel.state);
+      }
+    });
+  },
+
+  bindSaveBtn() {
+    document.getElementById('btn-save').addEventListener('click', () => {
+      GistSync.saveNow(DataModel.state);
     });
   },
 };
