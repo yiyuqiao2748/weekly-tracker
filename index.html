@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鏁堟灉鍥鹃儴闂?路 鍛ㄤ换鍔¤繘搴﹁〃</title>
+<title>效果图部门 · 周任务进度表</title>
 <style>
 /* ===== Reset ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
-  font-family: "Microsoft YaHei", "寰蒋闆呴粦", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Microsoft YaHei", "微软雅黑", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 13px;
   background: #eef1f5;
   color: #222;
@@ -124,7 +124,7 @@ body {
   min-height: 60px;
 }
 .column-body.empty::after {
-  content: '鏆傛棤浠诲姟';
+  content: '暂无任务';
   text-align: center; color: #ccc; font-size: 12px;
   padding: 20px 0;
 }
@@ -312,15 +312,15 @@ body {
 <body>
 
 <div id="toolbar">
-  <button type="button" class="week-nav" id="btn-prev-week" title="涓婁竴鍛?>鈼€</button>
+  <button type="button" class="week-nav" id="btn-prev-week" title="上一周">◀</button>
   <span class="week-label" id="week-label"></span>
-  <button type="button" class="week-nav" id="btn-next-week" title="涓嬩竴鍛?>鈻?/button>
-  <button type="button" id="btn-today">浠婂ぉ</button>
+  <button type="button" class="week-nav" id="btn-next-week" title="下一周">▶</button>
+  <button type="button" id="btn-today">今天</button>
   <span class="sep"></span>
-  <button type="button" id="btn-copy-prev">浠庝笂鍛ㄥ鍒舵湭瀹屾垚浠诲姟</button>
+  <button type="button" id="btn-copy-prev">从上周复制未完成任务</button>
   <span class="sep"></span>
-  <span id="sync-status"><span class="sync-dot"></span><span id="sync-text">鏈厤缃悓姝?/span></span>
-  <button type="button" id="btn-settings" title="鍚屾璁剧疆">鈿?/button>
+  <span id="sync-status"><span class="sync-dot"></span><span id="sync-text">未配置同步</span></span>
+  <button type="button" id="btn-settings" title="同步设置">⚙</button>
 </div>
 
 <div id="toast"></div>
@@ -328,17 +328,17 @@ body {
 
 <div id="settings-overlay">
   <div id="settings-dialog">
-    <h3>鈿?鍚屾璁剧疆</h3>
+    <h3>⚙ 同步设置</h3>
     <label>Gist ID</label>
-    <input type="text" id="cfg-gist-id" placeholder="浠?Gist URL 涓鍒讹紝濡?a1b2c3d4e5f6...">
-    <p class="hint">鍒涘缓涓€涓?<a href="https://gist.github.com/" target="_blank" rel="noopener">GitHub Gist</a>锛屽湪 URL 鏈熬鑾峰彇 ID</p>
+    <input type="text" id="cfg-gist-id" value="1c847a7d6d0e61fb090eb581d5e988b7" placeholder="从 Gist URL 中复制，如 a1b2c3d4e5f6...">
+    <p class="hint">创建一个 <a href="https://gist.github.com/" target="_blank" rel="noopener">GitHub Gist</a>，在 URL 末尾获取 ID</p>
     <label>GitHub Token</label>
     <input type="password" id="cfg-token" placeholder="ghp_xxxxxxxxxxxx">
-    <p class="hint">鍦?<a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> 鍒涘缓 classic token锛屽嬀閫?gist 鏉冮檺</p>
+    <p class="hint">在 <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> 创建 classic token，勾选 gist 权限</p>
     <div class="btn-row">
-      <button type="button" class="danger" id="btn-disconnect">鏂紑鍚屾</button>
-      <button type="button" id="btn-cancel-settings">鍙栨秷</button>
-      <button type="button" class="primary" id="btn-save-settings">淇濆瓨骞跺悓姝?/button>
+      <button type="button" class="danger" id="btn-disconnect">断开同步</button>
+      <button type="button" id="btn-cancel-settings">取消</button>
+      <button type="button" class="primary" id="btn-save-settings">保存并同步</button>
     </div>
   </div>
 </div>
@@ -350,16 +350,16 @@ body {
 const C = {
   STORAGE_KEY: 'renderDeptWeeklyTracker',
   SCHEMA_VERSION: 2,
-  MEMBERS: ['鏄撴涔?, '鏉ㄥ▉', '鏄撶伩', '鍒樻柊閲?],
+  MEMBERS: ['易榆乔', '杨威', '易灿', '刘新金'],
   DOT_CLASSES: ['dot-c0','dot-c1','dot-c2','dot-c3'],
-  PRIORITIES: ['楂?, '涓?, '浣?],
-  STATUSES: ['鏈紑濮?, '杩涜涓?, '宸插畬鎴?],
-  PRIO_CLASSES: { '楂?: 'prio-high', '涓?: 'prio-med', '浣?: 'prio-low' },
-  STATUS_CLASSES: { '鏈紑濮?: 'status-notstarted', '杩涜涓?: 'status-inprogress', '宸插畬鎴?: 'status-completed' },
+  PRIORITIES: ['高', '中', '低'],
+  STATUSES: ['未开始', '进行中', '已完成'],
+  PRIO_CLASSES: { '高': 'prio-high', '中': 'prio-med', '低': 'prio-low' },
+  STATUS_CLASSES: { '未开始': 'status-notstarted', '进行中': 'status-inprogress', '已完成': 'status-completed' },
 };
 
 // ======================================================================
-// GistSync 鈥?GitHub Gist data sync
+// GistSync — GitHub Gist data sync
 // ======================================================================
 const GistSync = {
   CONFIG_KEY: 'renderTrackerSyncConfig',
@@ -450,13 +450,13 @@ const GistSync = {
       SyncStatus.syncing();
       const ok = await this.push(state);
       if (ok) SyncStatus.configured();
-      else SyncStatus.error('鍚屾澶辫触');
+      else SyncStatus.error('同步失败');
     }, 3000);
   },
 };
 
 // ======================================================================
-// SyncStatus 鈥?UI indicator
+// SyncStatus — UI indicator
 // ======================================================================
 const SyncStatus = {
   _timer: null,
@@ -478,13 +478,13 @@ const SyncStatus = {
     document.getElementById('sync-status').classList.add('configured');
   },
 
-  configured() { this.set('synced', '宸插悓姝?); },
-  syncing()  { this.set('syncing', '鍚屾涓?..'); },
-  error(msg) { this.set('error', msg || '鍚屾澶辫触'); },
+  configured() { this.set('synced', '已同步'); },
+  syncing()  { this.set('syncing', '同步中...'); },
+  error(msg) { this.set('error', msg || '同步失败'); },
   notConfigured() {
     document.getElementById('sync-status').classList.remove('configured');
     document.getElementById('sync-status').className = '';
-    document.getElementById('sync-text').textContent = '鏈厤缃悓姝?;
+    document.getElementById('sync-text').textContent = '未配置同步';
   },
 };
 
@@ -502,7 +502,7 @@ const Toast = {
 };
 
 // ======================================================================
-// WeekUtils 鈥?ISO 8601 week calculations (unchanged from v1)
+// WeekUtils — ISO 8601 week calculations (unchanged from v1)
 // ======================================================================
 const WeekUtils = {
   getMonday(d) {
@@ -544,8 +544,8 @@ const WeekUtils = {
   },
   formatDateRange(weekStr) {
     const r = this.getWeekDateRange(weekStr);
-    const fmt = d => (d.getMonth() + 1) + '鏈? + d.getDate() + '鏃?;
-    return fmt(r.start) + ' 鈥?' + fmt(r.end);
+    const fmt = d => (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    return fmt(r.start) + ' — ' + fmt(r.end);
   },
   formatShortDate(isoStr) {
     if (!isoStr) return '';
@@ -599,7 +599,7 @@ const Storage = {
       SyncStatus.configured();
       return merged;
     }
-    SyncStatus.error('鏃犳硶鑾峰彇杩滅▼鏁版嵁');
+    SyncStatus.error('无法获取远程数据');
     return local;
   },
 
@@ -616,9 +616,9 @@ const Storage = {
               id: t.id + '_' + m,
               person: m,
               name: t.name || '',
-              priority: t.priority || '涓?,
+              priority: t.priority || '中',
               progress: prog.percentage || 0,
-              status: prog.status || '鏈紑濮?,
+              status: prog.status || '未开始',
               startDate: t.startDate || '',
               dueDate: t.dueDate || '',
               notes: t.notes || '',
@@ -641,7 +641,7 @@ const Storage = {
     try {
       localStorage.setItem(C.STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
-      Toast.show('瀛樺偍绌洪棿涓嶈冻锛岃娓呯悊鏃ф暟鎹?);
+      Toast.show('存储空间不足，请清理旧数据');
     }
   },
 
@@ -656,7 +656,7 @@ const Storage = {
 };
 
 // ======================================================================
-// DataModel 鈥?Simplified for per-person tasks
+// DataModel — Simplified for per-person tasks
 // ======================================================================
 const DataModel = {
   state: null,
@@ -681,9 +681,9 @@ const DataModel = {
       id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
       person,
       name: '',
-      priority: '涓?,
+      priority: '中',
       progress: 0,
-      status: '鏈紑濮?,
+      status: '未开始',
       startDate: '',
       dueDate: '',
       notes: '',
@@ -718,21 +718,21 @@ const DataModel = {
   },
 
   _applyStatusConstraint(task) {
-    if (task.status === '鏈紑濮?) task.progress = 0;
-    else if (task.status === '宸插畬鎴?) task.progress = 100;
+    if (task.status === '未开始') task.progress = 0;
+    else if (task.status === '已完成') task.progress = 100;
     else if (task.progress === 0) task.progress = 1;
     else if (task.progress >= 100) task.progress = 99;
   },
 
   _applyProgressConstraint(task) {
-    if (task.progress === 0) task.status = '鏈紑濮?;
-    else if (task.progress >= 100) { task.progress = 100; task.status = '宸插畬鎴?; }
-    else task.status = '杩涜涓?;
+    if (task.progress === 0) task.status = '未开始';
+    else if (task.progress >= 100) { task.progress = 100; task.status = '已完成'; }
+    else task.status = '进行中';
   },
 
   copyIncompleteFromPrev(weekStr) {
     const prevTasks = this.getPrevWeekTasks(weekStr);
-    const incomplete = prevTasks.filter(t => t.status !== '宸插畬鎴? && t.progress < 100);
+    const incomplete = prevTasks.filter(t => t.status !== '已完成' && t.progress < 100);
     if (incomplete.length === 0) return 0;
 
     incomplete.forEach(t => {
@@ -740,7 +740,7 @@ const DataModel = {
       copy.id = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
       copy.week = weekStr;
       copy.progress = 0;
-      copy.status = '鏈紑濮?;
+      copy.status = '未开始';
       copy.createdAt = new Date().toISOString();
       copy.updatedAt = new Date().toISOString();
       this.state.tasks.push(copy);
@@ -753,7 +753,7 @@ const DataModel = {
 };
 
 // ======================================================================
-// Renderer 鈥?Card-based layout
+// Renderer — Card-based layout
 // ======================================================================
 const Renderer = {
   renderAll(weekStr) {
@@ -763,7 +763,7 @@ const Renderer = {
 
   renderToolbar(weekStr) {
     document.getElementById('week-label').innerHTML =
-      `${weekStr.replace('-W', '骞寸')}鍛?<span class="date-range">(${WeekUtils.formatDateRange(weekStr)})</span>`;
+      `${weekStr.replace('-W', '年第')}周 <span class="date-range">(${WeekUtils.formatDateRange(weekStr)})</span>`;
   },
 
   renderBoard(weekStr) {
@@ -794,7 +794,7 @@ const Renderer = {
     let html = `<div class="column">`;
     html += `<div class="column-header">`;
     html += `<span class="person-name"><span class="dot ${dotCls}"></span>${person}</span>`;
-    html += `<span class="task-count">${tasks.length} 椤?/span>`;
+    html += `<span class="task-count">${tasks.length} 项</span>`;
     html += `</div>`;
 
     html += `<div class="column-body${empty}" id="col-body-${idx}">`;
@@ -804,7 +804,7 @@ const Renderer = {
     html += `</div>`;
 
     html += `<div class="column-footer">`;
-    html += `<button class="btn-add-person" data-person="${person}">+ 娣诲姞浠诲姟</button>`;
+    html += `<button class="btn-add-person" data-person="${person}">+ 添加任务</button>`;
     html += `</div>`;
     html += `</div>`;
     return html;
@@ -813,13 +813,13 @@ const Renderer = {
   _renderCard(task) {
     const pcls = C.PRIO_CLASSES[task.priority] || '';
     const scls = C.STATUS_CLASSES[task.status] || '';
-    const name = task.name || '<span class="placeholder">鐐瑰嚮杈撳叆浠诲姟鍚?/span>';
+    const name = task.name || '<span class="placeholder">点击输入任务名</span>';
     const dateStr = this._formatDatePair(task.startDate, task.dueDate);
-    const notes = task.notes || '<span class="placeholder">澶囨敞</span>';
+    const notes = task.notes || '<span class="placeholder">备注</span>';
 
     return `
     <div class="task-card" data-task-id="${task.id}">
-      <button class="card-del" data-task-id="${task.id}" title="鍒犻櫎">脳</button>
+      <button class="card-del" data-task-id="${task.id}" title="删除">×</button>
       <div class="card-row">
         <span class="task-name editable" data-field="name">${name}</span>
         <span class="prio-badge ${pcls} editable" data-field="priority">${task.priority}</span>
@@ -843,7 +843,7 @@ const Renderer = {
     else if (pct <= 30 && pct > 0) color = 'var(--progress-low)';
     else if (pct === 0) color = 'transparent';
 
-    return `<div class="prog-outer editable" data-field="progress" title="杩涘害 ${pct}%">
+    return `<div class="prog-outer editable" data-field="progress" title="进度 ${pct}%">
       <div class="prog-inner" style="width:${pct}%;background:${color};${pct===0?'min-width:0':''}"></div>
       <span class="prog-label">${pct}%</span>
     </div>`;
@@ -852,10 +852,10 @@ const Renderer = {
   _formatDatePair(start, end) {
     const s = WeekUtils.formatShortDate(start);
     const e = WeekUtils.formatShortDate(end);
-    if (!s && !e) return '<span class="placeholder">鏃ユ湡</span>';
+    if (!s && !e) return '<span class="placeholder">日期</span>';
     if (!s) return '~' + e;
     if (!e) return s + '~';
-    return s + ' 鈥?' + e;
+    return s + ' — ' + e;
   },
 
   _bindCardEvents(card) {
@@ -865,13 +865,13 @@ const Renderer = {
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const taskId = delBtn.dataset.taskId;
-        if (confirm('纭畾鍒犻櫎姝や换鍔★紵')) {
+        if (confirm('确定删除此任务？')) {
           Actions.deleteTask(taskId);
         }
       });
     }
 
-    // Editable fields 鈥?click to edit
+    // Editable fields — click to edit
     card.querySelectorAll('.editable').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -889,7 +889,7 @@ const Renderer = {
 
     // Update name
     const nameEl = card.querySelector('[data-field="name"]');
-    if (nameEl) nameEl.innerHTML = task.name || '<span class="placeholder">鐐瑰嚮杈撳叆浠诲姟鍚?/span>';
+    if (nameEl) nameEl.innerHTML = task.name || '<span class="placeholder">点击输入任务名</span>';
 
     // Update priority
     const prioEl = card.querySelector('[data-field="priority"]');
@@ -917,7 +917,7 @@ const Renderer = {
 
     // Update notes
     const notesEl = card.querySelector('[data-field="notes"]');
-    if (notesEl) notesEl.innerHTML = task.notes || '<span class="placeholder">澶囨敞</span>';
+    if (notesEl) notesEl.innerHTML = task.notes || '<span class="placeholder">备注</span>';
 
     // Re-bind events
     this._bindCardEvents(card);
@@ -925,7 +925,7 @@ const Renderer = {
 };
 
 // ======================================================================
-// Editor 鈥?Card inline editing
+// Editor — Card inline editing
 // ======================================================================
 const Editor = {
   currentCard: null,
@@ -1096,7 +1096,7 @@ const Editor = {
       const header = document.querySelector(`#col-body-${i}`)?.previousElementSibling;
       if (header) {
         const countEl = header.querySelector('.task-count');
-        if (countEl) countEl.textContent = count + ' 椤?;
+        if (countEl) countEl.textContent = count + ' 项';
       }
       const body = document.getElementById(`col-body-${i}`);
       if (body) {
@@ -1145,22 +1145,22 @@ const Actions = {
   deleteTask(taskId) {
     DataModel.deleteTask(taskId);
     Renderer.renderBoard(DataModel.state.currentWeek);
-    Toast.show('浠诲姟宸插垹闄?);
+    Toast.show('任务已删除');
   },
 
   copyFromPrev() {
     const count = DataModel.copyIncompleteFromPrev(DataModel.state.currentWeek);
     if (count > 0) {
       Renderer.renderAll(DataModel.state.currentWeek);
-      Toast.show(`宸插鍒?${count} 涓湭瀹屾垚浠诲姟`);
+      Toast.show(`已复制 ${count} 个未完成任务`);
     } else {
-      Toast.show('涓婂懆娌℃湁鏈畬鎴愮殑浠诲姟');
+      Toast.show('上周没有未完成的任务');
     }
   },
 };
 
 // ======================================================================
-// App 鈥?Entry point
+// App — Entry point
 // ======================================================================
 const App = {
   async init() {
@@ -1209,7 +1209,7 @@ const App = {
     // Open settings
     document.getElementById('btn-settings').addEventListener('click', () => {
       const cfg = GistSync.loadConfig();
-      gistInput.value = cfg.gistId || '';
+      gistInput.value = cfg.gistId || gistInput.value || '';
       tokenInput.value = cfg.token || '';
       overlay.classList.add('show');
     });
@@ -1226,7 +1226,7 @@ const App = {
     document.getElementById('btn-save-settings').addEventListener('click', async () => {
       const gistId = gistInput.value.trim();
       const token = tokenInput.value.trim();
-      if (!gistId || !token) { Toast.show('璇疯緭鍏?Gist ID 鍜?Token'); return; }
+      if (!gistId || !token) { Toast.show('请输入 Gist ID 和 Token'); return; }
       GistSync.saveConfig({ gistId, token });
       overlay.classList.remove('show');
       SyncStatus.showConfigured();
@@ -1235,19 +1235,19 @@ const App = {
       const ok = await GistSync.push(DataModel.state);
       if (ok) {
         SyncStatus.configured();
-        Toast.show('鍚屾閰嶇疆鎴愬姛');
+        Toast.show('同步配置成功');
       } else {
-        SyncStatus.error('涓婁紶澶辫触锛岃妫€鏌?Gist ID 鍜?Token');
+        SyncStatus.error('上传失败，请检查 Gist ID 和 Token');
       }
     });
 
     // Disconnect
     document.getElementById('btn-disconnect').addEventListener('click', () => {
-      if (confirm('纭畾鏂紑鍚屾锛熶簯绔暟鎹笉浼氳鍒犻櫎銆?)) {
+      if (confirm('确定断开同步？云端数据不会被删除。')) {
         GistSync.saveConfig({ gistId: '', token: '' });
         overlay.classList.remove('show');
         SyncStatus.notConfigured();
-        Toast.show('宸叉柇寮€鍚屾');
+        Toast.show('已断开同步');
       }
     });
   },
