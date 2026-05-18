@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鏁堟灉鍥鹃儴闂?路 鍛ㄤ换鍔¤繘搴﹁〃</title>
+<style>
+/* ===== Reset ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: "Microsoft YaHei", "寰蒋闆呴粦", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  background: #eef1f5;
+  color: #222;
+  display: flex; flex-direction: column;
+}
+
+/* ===== Variables ===== */
+:root {
+  --prio-high-bg: #FEE2E2; --prio-high-text: #DC2626;
+  --prio-med-bg:  #FEF3C7; --prio-med-text:  #D97706;
+  --prio-low-bg:  #D1FAE5; --prio-low-text:  #059669;
+  --status-not-bg:  #F3F4F6; --status-not-text:  #6B7280;
+  --status-prog-bg: #DBEAFE; --status-prog-text: #2563EB;
+  --status-done-bg: #D1FAE5; --status-done-text: #059669;
+  --progress-bg: #e5e7eb;
+  --progress-low: #ef4444;
+  --progress-mid: #3b82f6;
+  --progress-high: #10b981;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  --card-hover-shadow: 0 3px 12px rgba(0,0,0,0.12);
+}
+
+/* ===== Toolbar ===== */
+#toolbar {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid #dde;
+  z-index: 100;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+#toolbar .sep { flex: 1; }
+#toolbar button {
+  font-family: inherit; font-size: 12px;
+  padding: 5px 14px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: #fff; cursor: pointer;
+  white-space: nowrap; color: #444;
+  transition: all 0.15s;
+}
+#toolbar button:hover { background: #f0f0f0; border-color: #bbb; }
+#toolbar button:active { background: #e0e0e0; }
+#toolbar button.accent {
+  background: #1a73e8; color: #fff; border-color: #1a73e8;
+  font-weight: 500;
+}
+#toolbar button.accent:hover { background: #1557b0; }
+#toolbar .week-nav { font-size: 16px; padding: 4px 10px; }
+#toolbar .week-label {
+  font-size: 15px; font-weight: 600; min-width: 240px; text-align: center;
+}
+#toolbar .week-label .date-range { font-weight: 400; color: #888; font-size: 12px; }
+
+/* ===== Toast ===== */
+#toast {
+  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+  padding: 8px 20px; border-radius: 6px; font-size: 13px;
+  z-index: 9999; pointer-events: none;
+  opacity: 0; transition: opacity 0.3s;
+  background: #333; color: #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+#toast.show { opacity: 1; }
+
+/* ===== Main grid ===== */
+#board {
+  flex: 1; overflow-y: auto; overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 12px;
+  align-content: start;
+}
+
+/* ===== Column ===== */
+.column {
+  background: #fff;
+  border-radius: 8px;
+  display: flex; flex-direction: column;
+  min-width: 200px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.column-header {
+  padding: 10px 14px;
+  border-bottom: 2px solid #e8e8e8;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.column-header .person-name {
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; gap: 6px;
+}
+.column-header .person-name .dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.dot-c0 { background: #6366f1; }
+.dot-c1 { background: #f59e0b; }
+.dot-c2 { background: #10b981; }
+.dot-c3 { background: #ec4899; }
+
+.column-header .task-count {
+  font-size: 12px; color: #999; font-weight: 400;
+  background: #f3f4f6; padding: 2px 8px; border-radius: 10px;
+}
+.column-body {
+  flex: 1; overflow-y: auto;
+  padding: 8px 6px;
+  display: flex; flex-direction: column; gap: 8px;
+  min-height: 60px;
+}
+.column-body.empty::after {
+  content: '鏆傛棤浠诲姟';
+  text-align: center; color: #ccc; font-size: 12px;
+  padding: 20px 0;
+}
+.column-footer {
+  padding: 6px 8px 10px;
+  flex-shrink: 0;
+}
+.column-footer button {
+  width: 100%; padding: 6px;
+  border: 1px dashed #d0d0d0; border-radius: 6px;
+  background: transparent; color: #999; cursor: pointer;
+  font-family: inherit; font-size: 12px;
+  transition: all 0.15s;
+}
+.column-footer button:hover {
+  border-color: #1a73e8; color: #1a73e8; background: #e8f0fe;
+}
+
+/* ===== Task Card ===== */
+.task-card {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: default;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  position: relative;
+  box-shadow: var(--card-shadow);
+}
+.task-card:hover {
+  box-shadow: var(--card-hover-shadow);
+  border-color: #d0d0d0;
+}
+.task-card .card-row {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 4px;
+}
+.task-card .card-row:last-child { margin-bottom: 0; }
+.task-card .task-name {
+  font-weight: 600; font-size: 13px;
+  flex: 1;
+  color: #222;
+}
+.task-card .task-name.editable { cursor: text; }
+.task-card .task-name .placeholder { color: #ccc; font-weight: 400; }
+
+/* Priority badge */
+.prio-badge {
+  display: inline-block; padding: 1px 7px; border-radius: 3px;
+  font-size: 11px; font-weight: 600; flex-shrink: 0;
+}
+.prio-high { background: var(--prio-high-bg); color: var(--prio-high-text); }
+.prio-med  { background: var(--prio-med-bg);  color: var(--prio-med-text);  }
+.prio-low  { background: var(--prio-low-bg);  color: var(--prio-low-text);  }
+
+/* Progress bar */
+.prog-outer {
+  flex: 1; height: 14px; background: var(--progress-bg);
+  border-radius: 3px; overflow: hidden;
+  position: relative; min-width: 40px;
+}
+.prog-inner {
+  height: 100%; border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.prog-label {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 600; line-height: 1;
+  color: #333; text-shadow: 0 0 2px #fff;
+}
+
+/* Status badge */
+.status-badge {
+  display: inline-block; padding: 1px 7px; border-radius: 3px;
+  font-size: 11px; font-weight: 500; flex-shrink: 0;
+}
+.status-notstarted { background: var(--status-not-bg);  color: var(--status-not-text);  }
+.status-inprogress { background: var(--status-prog-bg); color: var(--status-prog-text); }
+.status-completed  { background: var(--status-done-bg); color: var(--status-done-text); }
+
+/* Dates & notes */
+.task-card .date-range { font-size: 11px; color: #999; }
+.task-card .notes { font-size: 11px; color: #777; }
+.task-card .notes .placeholder { color: #ddd; }
+
+/* Delete button */
+.card-del {
+  position: absolute; top: 4px; right: 6px;
+  width: 18px; height: 18px; line-height: 18px; text-align: center;
+  border-radius: 50%; border: none; background: transparent;
+  color: #ccc; font-size: 14px; cursor: pointer;
+  opacity: 0; transition: opacity 0.15s;
+}
+.task-card:hover .card-del { opacity: 1; }
+.card-del:hover { background: #fee; color: #e00; }
+
+/* ===== Inline Edit ===== */
+.editable { cursor: pointer; }
+.task-card input, .task-card select {
+  font-family: inherit; font-size: inherit;
+  border: 1px solid #2196F3; border-radius: 3px;
+  outline: none; padding: 1px 4px;
+}
+.task-card input[type="text"] { width: 100%; }
+.task-card input[type="number"] { width: 56px; text-align: center; }
+.task-card input[type="date"] { width: 110px; }
+.task-card select { cursor: pointer; }
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
+
+/* ===== Sync Indicator ===== */
+#sync-status {
+  display: none; align-items: center; gap: 4px;
+  font-size: 12px; color: #999;
+}
+#sync-status.configured { display: flex; }
+#sync-status .sync-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #ccc;
+}
+#sync-status.synced .sync-dot { background: #10b981; }
+#sync-status.syncing .sync-dot { background: #f59e0b; animation: pulse 0.8s infinite; }
+#sync-status.error .sync-dot { background: #ef4444; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+#btn-settings {
+  font-size: 14px; padding: 4px 8px; border: 1px solid transparent;
+  background: transparent; cursor: pointer; border-radius: 4px;
+}
+#btn-settings:hover { background: #f0f0f0; border-color: #ddd; }
+
+/* ===== Settings Dialog ===== */
+#settings-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4); z-index: 10000;
+  align-items: center; justify-content: center;
+}
+#settings-overlay.show { display: flex; }
+#settings-dialog {
+  background: #fff; border-radius: 10px; padding: 24px;
+  width: 420px; max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+#settings-dialog h3 { margin-bottom: 16px; font-size: 16px; }
+#settings-dialog label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: #666; margin-bottom: 4px; margin-top: 12px;
+}
+#settings-dialog label:first-of-type { margin-top: 0; }
+#settings-dialog input {
+  width: 100%; padding: 7px 10px; border: 1px solid #d0d0d0;
+  border-radius: 4px; font-family: inherit; font-size: 13px;
+}
+#settings-dialog input:focus { outline: none; border-color: #1a73e8; }
+#settings-dialog .hint {
+  font-size: 11px; color: #999; margin-top: 2px;
+}
+#settings-dialog .hint a { color: #1a73e8; }
+#settings-dialog .btn-row {
+  display: flex; gap: 8px; justify-content: flex-end;
+  margin-top: 16px;
+}
+#settings-dialog button {
+  font-family: inherit; font-size: 12px;
+  padding: 6px 16px; border-radius: 4px; cursor: pointer;
+  border: 1px solid #d0d0d0; background: #fff;
+}
+#settings-dialog button.primary {
+  background: #1a73e8; color: #fff; border-color: #1a73e8;
+}
+#settings-dialog button.primary:hover { background: #1557b0; }
+#settings-dialog button.danger { color: #e00; border-color: transparent; background: transparent; }
+#settings-dialog button.danger:hover { background: #fee; }
+
+/* ===== Responsive ===== */
+@media (max-width: 1000px) { #board { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { #board { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button type="button" class="week-nav" id="btn-prev-week" title="涓婁竴鍛?>鈼€</button>
+  <span class="week-label" id="week-label"></span>
+  <button type="button" class="week-nav" id="btn-next-week" title="涓嬩竴鍛?>鈻?/button>
+  <button type="button" id="btn-today">浠婂ぉ</button>
+  <span class="sep"></span>
+  <button type="button" id="btn-copy-prev">浠庝笂鍛ㄥ鍒舵湭瀹屾垚浠诲姟</button>
+  <span class="sep"></span>
+  <span id="sync-status"><span class="sync-dot"></span><span id="sync-text">鏈厤缃悓姝?/span></span>
+  <button type="button" id="btn-settings" title="鍚屾璁剧疆">鈿?/button>
+</div>
+
+<div id="toast"></div>
+<div id="board"></div>
+
+<div id="settings-overlay">
+  <div id="settings-dialog">
+    <h3>鈿?鍚屾璁剧疆</h3>
+    <label>Gist ID</label>
+    <input type="text" id="cfg-gist-id" placeholder="浠?Gist URL 涓鍒讹紝濡?a1b2c3d4e5f6...">
+    <p class="hint">鍒涘缓涓€涓?<a href="https://gist.github.com/" target="_blank" rel="noopener">GitHub Gist</a>锛屽湪 URL 鏈熬鑾峰彇 ID</p>
+    <label>GitHub Token</label>
+    <input type="password" id="cfg-token" placeholder="ghp_xxxxxxxxxxxx">
+    <p class="hint">鍦?<a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> 鍒涘缓 classic token锛屽嬀閫?gist 鏉冮檺</p>
+    <div class="btn-row">
+      <button type="button" class="danger" id="btn-disconnect">鏂紑鍚屾</button>
+      <button type="button" id="btn-cancel-settings">鍙栨秷</button>
+      <button type="button" class="primary" id="btn-save-settings">淇濆瓨骞跺悓姝?/button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======================================================================
+// Constants
+// ======================================================================
+const C = {
+  STORAGE_KEY: 'renderDeptWeeklyTracker',
+  SCHEMA_VERSION: 2,
+  MEMBERS: ['鏄撴涔?, '鏉ㄥ▉', '鏄撶伩', '鍒樻柊閲?],
+  DOT_CLASSES: ['dot-c0','dot-c1','dot-c2','dot-c3'],
+  PRIORITIES: ['楂?, '涓?, '浣?],
+  STATUSES: ['鏈紑濮?, '杩涜涓?, '宸插畬鎴?],
+  PRIO_CLASSES: { '楂?: 'prio-high', '涓?: 'prio-med', '浣?: 'prio-low' },
+  STATUS_CLASSES: { '鏈紑濮?: 'status-notstarted', '杩涜涓?: 'status-inprogress', '宸插畬鎴?: 'status-completed' },
+};
+
+// ======================================================================
+// GistSync 鈥?GitHub Gist data sync
+// ======================================================================
+const GistSync = {
+  CONFIG_KEY: 'renderTrackerSyncConfig',
+
+  loadConfig() {
+    try {
+      const raw = localStorage.getItem(this.CONFIG_KEY);
+      return raw ? JSON.parse(raw) : { gistId: '', token: '' };
+    } catch { return { gistId: '', token: '' }; }
+  },
+
+  saveConfig(cfg) {
+    localStorage.setItem(this.CONFIG_KEY, JSON.stringify(cfg));
+  },
+
+  isConfigured() {
+    const cfg = this.loadConfig();
+    return !!(cfg.gistId && cfg.token);
+  },
+
+  async pull() {
+    const cfg = this.loadConfig();
+    if (!cfg.gistId || !cfg.token) return null;
+    try {
+      const resp = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+        headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json' },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const gist = await resp.json();
+      const file = Object.values(gist.files)[0];
+      if (!file || !file.content) return null;
+      const data = JSON.parse(file.content);
+      return data;
+    } catch (e) {
+      console.warn('Gist pull failed:', e.message);
+      return null;
+    }
+  },
+
+  async push(state) {
+    const cfg = this.loadConfig();
+    if (!cfg.gistId || !cfg.token) return false;
+    try {
+      const content = JSON.stringify(state, null, 2);
+      const resp = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json' },
+        body: JSON.stringify({
+          files: { 'weekly-data.json': { content } },
+        }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return true;
+    } catch (e) {
+      console.warn('Gist push failed:', e.message);
+      return false;
+    }
+  },
+
+  // Merge remote into local: tasks from either side kept, deduped by id.
+  // Remote wins on conflict (same id, newer updatedAt).
+  merge(localState, remoteState) {
+    if (!remoteState || !remoteState.tasks) return localState;
+    const taskMap = new Map();
+    // Local first
+    (localState.tasks || []).forEach(t => taskMap.set(t.id, t));
+    // Remote overrides if newer
+    (remoteState.tasks || []).forEach(t => {
+      const existing = taskMap.get(t.id);
+      if (!existing || (t.updatedAt > existing.updatedAt)) {
+        taskMap.set(t.id, t);
+      }
+    });
+    return {
+      ...localState,
+      tasks: Array.from(taskMap.values()),
+      // Keep the newer currentWeek
+      currentWeek: localState.currentWeek || remoteState.currentWeek,
+    };
+  },
+
+  // Debounced push: call after every save, batches uploads
+  _pushTimer: null,
+  pushDebounced(state) {
+    if (!this.isConfigured()) return;
+    clearTimeout(this._pushTimer);
+    this._pushTimer = setTimeout(async () => {
+      SyncStatus.syncing();
+      const ok = await this.push(state);
+      if (ok) SyncStatus.configured();
+      else SyncStatus.error('鍚屾澶辫触');
+    }, 3000);
+  },
+};
+
+// ======================================================================
+// SyncStatus 鈥?UI indicator
+// ======================================================================
+const SyncStatus = {
+  _timer: null,
+
+  set(state, text) {
+    const el = document.getElementById('sync-status');
+    const txt = document.getElementById('sync-text');
+    el.className = state;
+    if (state === 'configured') el.classList.add('configured');
+    txt.textContent = text || '';
+    if (state === 'configured') {
+      // After synced, auto-fade to idle
+      clearTimeout(this._timer);
+      this._timer = setTimeout(() => { txt.textContent = ''; }, 2000);
+    }
+  },
+
+  showConfigured() {
+    document.getElementById('sync-status').classList.add('configured');
+  },
+
+  configured() { this.set('synced', '宸插悓姝?); },
+  syncing()  { this.set('syncing', '鍚屾涓?..'); },
+  error(msg) { this.set('error', msg || '鍚屾澶辫触'); },
+  notConfigured() {
+    document.getElementById('sync-status').classList.remove('configured');
+    document.getElementById('sync-status').className = '';
+    document.getElementById('sync-text').textContent = '鏈厤缃悓姝?;
+  },
+};
+
+// ======================================================================
+// Toast
+// ======================================================================
+const Toast = {
+  _timer: null,
+  show(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => el.classList.remove('show'), 2000);
+  }
+};
+
+// ======================================================================
+// WeekUtils 鈥?ISO 8601 week calculations (unchanged from v1)
+// ======================================================================
+const WeekUtils = {
+  getMonday(d) {
+    const c = new Date(d);
+    const day = c.getDay() || 7;
+    c.setDate(c.getDate() - day + 1);
+    c.setHours(0,0,0,0);
+    return c;
+  },
+  getISOWeek(d) {
+    const monday = this.getMonday(d);
+    const thursday = new Date(monday);
+    thursday.setDate(monday.getDate() + 3);
+    const year = thursday.getFullYear();
+    const jan4 = new Date(year, 0, 4);
+    const jan4Monday = this.getMonday(jan4);
+    const weekNum = Math.round(((thursday - jan4Monday) / 86400000) / 7) + 1;
+    return { year, week: weekNum };
+  },
+  formatWeekStr(y, w) { return y + '-W' + String(w).padStart(2, '0'); },
+  parseWeekStr(str) {
+    const m = str.match(/^(\d{4})-W(\d{2})$/);
+    return m ? { year: +m[1], week: +m[2] } : null;
+  },
+  weekStrToMonday(weekStr) {
+    const p = this.parseWeekStr(weekStr);
+    if (!p) return new Date();
+    const jan4 = new Date(p.year, 0, 4);
+    const jan4Monday = this.getMonday(jan4);
+    const r = new Date(jan4Monday);
+    r.setDate(jan4Monday.getDate() + (p.week - 1) * 7);
+    return r;
+  },
+  getWeekDateRange(weekStr) {
+    const monday = this.weekStrToMonday(weekStr);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return { start: monday, end: sunday };
+  },
+  formatDateRange(weekStr) {
+    const r = this.getWeekDateRange(weekStr);
+    const fmt = d => (d.getMonth() + 1) + '鏈? + d.getDate() + '鏃?;
+    return fmt(r.start) + ' 鈥?' + fmt(r.end);
+  },
+  formatShortDate(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return isoStr;
+    return (d.getMonth() + 1) + '/' + d.getDate();
+  },
+  addWeeks(weekStr, delta) {
+    const monday = this.weekStrToMonday(weekStr);
+    monday.setDate(monday.getDate() + delta * 7);
+    const iso = this.getISOWeek(monday);
+    return this.formatWeekStr(iso.year, iso.week);
+  },
+  isCurrentWeek(weekStr) {
+    const now = this.getISOWeek(new Date());
+    return weekStr === this.formatWeekStr(now.year, now.week);
+  },
+};
+
+// ======================================================================
+// Storage
+// ======================================================================
+const Storage = {
+  load() {
+    try {
+      const raw = localStorage.getItem(C.STORAGE_KEY);
+      if (!raw) return this.getDefault();
+      const state = JSON.parse(raw);
+      if (!state) return this.getDefault();
+      if (state.schemaVersion === 1) return this.migrateV1toV2(state);
+      if (state.schemaVersion !== C.SCHEMA_VERSION) return this.getDefault();
+      return state;
+    } catch (e) {
+      return this.getDefault();
+    }
+  },
+
+  // Async load: local first, then try remote merge
+  async loadAsync() {
+    const local = this.load();
+    if (!GistSync.isConfigured()) {
+      SyncStatus.notConfigured();
+      return local;
+    }
+    SyncStatus.showConfigured();
+    SyncStatus.syncing();
+    const remote = await GistSync.pull();
+    if (remote) {
+      const merged = GistSync.merge(local, remote);
+      this.save(merged);
+      SyncStatus.configured();
+      return merged;
+    }
+    SyncStatus.error('鏃犳硶鑾峰彇杩滅▼鏁版嵁');
+    return local;
+  },
+
+  migrateV1toV2(v1) {
+    // Convert old per-person-progress tasks to new per-person tasks
+    const newTasks = [];
+    if (Array.isArray(v1.tasks)) {
+      v1.tasks.forEach(t => {
+        if (t.progress) {
+          C.MEMBERS.forEach(m => {
+            const prog = t.progress[m];
+            if (!prog) return;
+            newTasks.push({
+              id: t.id + '_' + m,
+              person: m,
+              name: t.name || '',
+              priority: t.priority || '涓?,
+              progress: prog.percentage || 0,
+              status: prog.status || '鏈紑濮?,
+              startDate: t.startDate || '',
+              dueDate: t.dueDate || '',
+              notes: t.notes || '',
+              week: t.week || v1.currentWeek,
+              createdAt: t.createdAt || new Date().toISOString(),
+              updatedAt: t.updatedAt || new Date().toISOString(),
+            });
+          });
+        }
+      });
+    }
+    return {
+      schemaVersion: C.SCHEMA_VERSION,
+      currentWeek: v1.currentWeek || this.getDefault().currentWeek,
+      tasks: newTasks,
+    };
+  },
+
+  save(state) {
+    try {
+      localStorage.setItem(C.STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      Toast.show('瀛樺偍绌洪棿涓嶈冻锛岃娓呯悊鏃ф暟鎹?);
+    }
+  },
+
+  getDefault() {
+    const now = WeekUtils.getISOWeek(new Date());
+    return {
+      schemaVersion: C.SCHEMA_VERSION,
+      currentWeek: WeekUtils.formatWeekStr(now.year, now.week),
+      tasks: [],
+    };
+  },
+};
+
+// ======================================================================
+// DataModel 鈥?Simplified for per-person tasks
+// ======================================================================
+const DataModel = {
+  state: null,
+
+  init(raw) { this.state = raw; },
+
+  getTasks(weekStr) {
+    return this.state.tasks.filter(t => t.week === weekStr);
+  },
+
+  getTasksByPerson(weekStr, person) {
+    return this.state.tasks.filter(t => t.week === weekStr && t.person === person);
+  },
+
+  getPrevWeekTasks(weekStr) {
+    const prev = WeekUtils.addWeeks(weekStr, -1);
+    return this.state.tasks.filter(t => t.week === prev);
+  },
+
+  newTask(weekStr, person) {
+    return {
+      id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      person,
+      name: '',
+      priority: '涓?,
+      progress: 0,
+      status: '鏈紑濮?,
+      startDate: '',
+      dueDate: '',
+      notes: '',
+      week: weekStr,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  },
+
+  addTask(weekStr, person) {
+    const task = this.newTask(weekStr, person);
+    this.state.tasks.push(task);
+    this._save();
+    return task;
+  },
+
+  deleteTask(taskId) {
+    const idx = this.state.tasks.findIndex(t => t.id === taskId);
+    if (idx === -1) return;
+    this.state.tasks.splice(idx, 1);
+    this._save();
+  },
+
+  updateField(taskId, field, value) {
+    const task = this.state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    task[field] = value;
+    if (field === 'status') this._applyStatusConstraint(task);
+    else if (field === 'progress') this._applyProgressConstraint(task);
+    task.updatedAt = new Date().toISOString();
+    this._save();
+  },
+
+  _applyStatusConstraint(task) {
+    if (task.status === '鏈紑濮?) task.progress = 0;
+    else if (task.status === '宸插畬鎴?) task.progress = 100;
+    else if (task.progress === 0) task.progress = 1;
+    else if (task.progress >= 100) task.progress = 99;
+  },
+
+  _applyProgressConstraint(task) {
+    if (task.progress === 0) task.status = '鏈紑濮?;
+    else if (task.progress >= 100) { task.progress = 100; task.status = '宸插畬鎴?; }
+    else task.status = '杩涜涓?;
+  },
+
+  copyIncompleteFromPrev(weekStr) {
+    const prevTasks = this.getPrevWeekTasks(weekStr);
+    const incomplete = prevTasks.filter(t => t.status !== '宸插畬鎴? && t.progress < 100);
+    if (incomplete.length === 0) return 0;
+
+    incomplete.forEach(t => {
+      const copy = JSON.parse(JSON.stringify(t));
+      copy.id = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      copy.week = weekStr;
+      copy.progress = 0;
+      copy.status = '鏈紑濮?;
+      copy.createdAt = new Date().toISOString();
+      copy.updatedAt = new Date().toISOString();
+      this.state.tasks.push(copy);
+    });
+    this._save();
+    return incomplete.length;
+  },
+
+  _save() { Storage.save(this.state); GistSync.pushDebounced(this.state); },
+};
+
+// ======================================================================
+// Renderer 鈥?Card-based layout
+// ======================================================================
+const Renderer = {
+  renderAll(weekStr) {
+    this.renderToolbar(weekStr);
+    this.renderBoard(weekStr);
+  },
+
+  renderToolbar(weekStr) {
+    document.getElementById('week-label').innerHTML =
+      `${weekStr.replace('-W', '骞寸')}鍛?<span class="date-range">(${WeekUtils.formatDateRange(weekStr)})</span>`;
+  },
+
+  renderBoard(weekStr) {
+    const board = document.getElementById('board');
+    let html = '';
+    C.MEMBERS.forEach(person => {
+      const tasks = DataModel.getTasksByPerson(weekStr, person);
+      html += this._renderColumn(person, tasks);
+    });
+    board.innerHTML = html;
+
+    // Bind events
+    C.MEMBERS.forEach((person, i) => {
+      const colBody = document.getElementById(`col-body-${i}`);
+      if (colBody) {
+        colBody.querySelectorAll('.task-card').forEach(card => {
+          this._bindCardEvents(card);
+        });
+      }
+    });
+  },
+
+  _renderColumn(person, tasks) {
+    const idx = C.MEMBERS.indexOf(person);
+    const dotCls = C.DOT_CLASSES[idx];
+    const empty = tasks.length === 0 ? ' empty' : '';
+
+    let html = `<div class="column">`;
+    html += `<div class="column-header">`;
+    html += `<span class="person-name"><span class="dot ${dotCls}"></span>${person}</span>`;
+    html += `<span class="task-count">${tasks.length} 椤?/span>`;
+    html += `</div>`;
+
+    html += `<div class="column-body${empty}" id="col-body-${idx}">`;
+    tasks.forEach(task => {
+      html += this._renderCard(task);
+    });
+    html += `</div>`;
+
+    html += `<div class="column-footer">`;
+    html += `<button class="btn-add-person" data-person="${person}">+ 娣诲姞浠诲姟</button>`;
+    html += `</div>`;
+    html += `</div>`;
+    return html;
+  },
+
+  _renderCard(task) {
+    const pcls = C.PRIO_CLASSES[task.priority] || '';
+    const scls = C.STATUS_CLASSES[task.status] || '';
+    const name = task.name || '<span class="placeholder">鐐瑰嚮杈撳叆浠诲姟鍚?/span>';
+    const dateStr = this._formatDatePair(task.startDate, task.dueDate);
+    const notes = task.notes || '<span class="placeholder">澶囨敞</span>';
+
+    return `
+    <div class="task-card" data-task-id="${task.id}">
+      <button class="card-del" data-task-id="${task.id}" title="鍒犻櫎">脳</button>
+      <div class="card-row">
+        <span class="task-name editable" data-field="name">${name}</span>
+        <span class="prio-badge ${pcls} editable" data-field="priority">${task.priority}</span>
+      </div>
+      <div class="card-row">
+        ${this._renderProgressBar(task.progress)}
+        <span class="status-badge ${scls} editable" data-field="status">${task.status}</span>
+      </div>
+      <div class="card-row">
+        <span class="date-range editable" data-field="startDate">${dateStr}</span>
+      </div>
+      <div class="card-row">
+        <span class="notes editable" data-field="notes">${notes}</span>
+      </div>
+    </div>`;
+  },
+
+  _renderProgressBar(pct) {
+    let color = 'var(--progress-mid)';
+    if (pct >= 70) color = 'var(--progress-high)';
+    else if (pct <= 30 && pct > 0) color = 'var(--progress-low)';
+    else if (pct === 0) color = 'transparent';
+
+    return `<div class="prog-outer editable" data-field="progress" title="杩涘害 ${pct}%">
+      <div class="prog-inner" style="width:${pct}%;background:${color};${pct===0?'min-width:0':''}"></div>
+      <span class="prog-label">${pct}%</span>
+    </div>`;
+  },
+
+  _formatDatePair(start, end) {
+    const s = WeekUtils.formatShortDate(start);
+    const e = WeekUtils.formatShortDate(end);
+    if (!s && !e) return '<span class="placeholder">鏃ユ湡</span>';
+    if (!s) return '~' + e;
+    if (!e) return s + '~';
+    return s + ' 鈥?' + e;
+  },
+
+  _bindCardEvents(card) {
+    // Delete button
+    const delBtn = card.querySelector('.card-del');
+    if (delBtn) {
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskId = delBtn.dataset.taskId;
+        if (confirm('纭畾鍒犻櫎姝や换鍔★紵')) {
+          Actions.deleteTask(taskId);
+        }
+      });
+    }
+
+    // Editable fields 鈥?click to edit
+    card.querySelectorAll('.editable').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (el.classList.contains('editing')) return;
+        Editor.startEdit(el, card);
+      });
+    });
+  },
+
+  // DOM patch a single card element
+  patchCard(card) {
+    const taskId = card.dataset.taskId;
+    const task = DataModel.state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Update name
+    const nameEl = card.querySelector('[data-field="name"]');
+    if (nameEl) nameEl.innerHTML = task.name || '<span class="placeholder">鐐瑰嚮杈撳叆浠诲姟鍚?/span>';
+
+    // Update priority
+    const prioEl = card.querySelector('[data-field="priority"]');
+    if (prioEl) {
+      prioEl.textContent = task.priority;
+      prioEl.className = `prio-badge ${C.PRIO_CLASSES[task.priority]} editable`;
+      prioEl.dataset.field = 'priority';
+    }
+
+    // Update progress bar
+    const progEl = card.querySelector('[data-field="progress"]');
+    if (progEl) progEl.outerHTML = this._renderProgressBar(task.progress);
+
+    // Update status
+    const statusEl = card.querySelector('[data-field="status"]');
+    if (statusEl) {
+      statusEl.textContent = task.status;
+      statusEl.className = `status-badge ${C.STATUS_CLASSES[task.status]} editable`;
+      statusEl.dataset.field = 'status';
+    }
+
+    // Update date
+    const dateEl = card.querySelector('[data-field="startDate"]');
+    if (dateEl) dateEl.innerHTML = this._formatDatePair(task.startDate, task.dueDate);
+
+    // Update notes
+    const notesEl = card.querySelector('[data-field="notes"]');
+    if (notesEl) notesEl.innerHTML = task.notes || '<span class="placeholder">澶囨敞</span>';
+
+    // Re-bind events
+    this._bindCardEvents(card);
+  },
+};
+
+// ======================================================================
+// Editor 鈥?Card inline editing
+// ======================================================================
+const Editor = {
+  currentCard: null,
+  currentField: null,
+
+  startEdit(el, card) {
+    if (this.currentField) this.cancelEdit(false);
+    this.currentCard = card;
+    this.currentField = el;
+    el.classList.add('editing');
+
+    const taskId = card.dataset.taskId;
+    const task = DataModel.state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const field = el.dataset.field;
+    const raw = task[field];
+
+    if (field === 'priority') {
+      const sel = this._makeSelect(C.PRIORITIES, raw);
+      el.innerHTML = '';
+      el.appendChild(sel);
+      sel.focus();
+      this._bindSelectEvents(sel, el, card);
+      return;
+    }
+
+    if (field === 'status') {
+      const sel = this._makeSelect(C.STATUSES, raw);
+      el.innerHTML = '';
+      el.appendChild(sel);
+      sel.focus();
+      this._bindSelectEvents(sel, el, card);
+      return;
+    }
+
+    if (field === 'progress') {
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = 0; input.max = 100; input.step = 5;
+      input.value = raw;
+      el.innerHTML = '';
+      el.appendChild(input);
+      this._bindInputEvents(input, el, card);
+      input.focus();
+      input.select();
+      return;
+    }
+
+    if (field === 'startDate') {
+      const input = document.createElement('input');
+      input.type = 'date';
+      if (raw) input.value = raw;
+      el.innerHTML = '';
+      el.appendChild(input);
+      this._bindInputEvents(input, el, card);
+      input.focus();
+      return;
+    }
+
+    // text field (name, notes)
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = raw || '';
+    el.innerHTML = '';
+    el.appendChild(input);
+    this._bindInputEvents(input, el, card);
+    input.focus();
+    input.select();
+  },
+
+  _makeSelect(options, current) {
+    const sel = document.createElement('select');
+    options.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o; opt.textContent = o;
+      if (o === current) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    return sel;
+  },
+
+  _bindSelectEvents(sel, el, card) {
+    sel.addEventListener('change', () => {
+      this._commit(card, el, sel.value);
+    });
+    sel.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (this.currentField === el) this._commit(card, el, sel.value);
+      }, 100);
+    });
+    sel.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); this.cancelEdit(); }
+    });
+  },
+
+  _bindInputEvents(input, el, card) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this._commit(card, el, input.value);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this.cancelEdit();
+      }
+    });
+    input.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (this.currentField === el) this._commit(card, el, input.value);
+      }, 100);
+    });
+  },
+
+  _commit(card, el, value) {
+    if (this.currentField !== el) return;
+    this.currentField = null;
+    el.classList.remove('editing');
+
+    const taskId = card.dataset.taskId;
+    const field = el.dataset.field;
+    const task = DataModel.state.tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    let parsed = value;
+    if (field === 'progress') {
+      parsed = parseInt(value, 10);
+      if (isNaN(parsed)) parsed = 0;
+      parsed = Math.max(0, Math.min(100, parsed));
+    }
+
+    if (parsed === task[field]) {
+      Renderer.patchCard(card);
+      return;
+    }
+
+    // For startDate, also save dueDate from the same date-pair UI
+    if (field === 'startDate') {
+      DataModel.updateField(taskId, 'startDate', parsed);
+      // Just update startDate, keep dueDate as-is for simplicity
+    } else {
+      DataModel.updateField(taskId, field, parsed);
+    }
+
+    // Re-fetch and patch
+    const updated = DataModel.state.tasks.find(t => t.id === taskId);
+    if (updated) {
+      Renderer.patchCard(card);
+      // Refresh column header count
+      this._refreshColumnCount();
+    }
+  },
+
+  cancelEdit(restore = true) {
+    if (!this.currentField) return;
+    const el = this.currentField;
+    const card = this.currentCard;
+    this.currentField = null;
+    this.currentCard = null;
+    el.classList.remove('editing');
+    if (restore && card) {
+      Renderer.patchCard(card);
+    }
+  },
+
+  _refreshColumnCount() {
+    const weekStr = DataModel.state.currentWeek;
+    C.MEMBERS.forEach((person, i) => {
+      const count = DataModel.getTasksByPerson(weekStr, person).length;
+      const header = document.querySelector(`#col-body-${i}`)?.previousElementSibling;
+      if (header) {
+        const countEl = header.querySelector('.task-count');
+        if (countEl) countEl.textContent = count + ' 椤?;
+      }
+      const body = document.getElementById(`col-body-${i}`);
+      if (body) {
+        body.classList.toggle('empty', count === 0);
+      }
+    });
+  },
+};
+
+// ======================================================================
+// Actions
+// ======================================================================
+const Actions = {
+  previousWeek() {
+    DataModel.state.currentWeek = WeekUtils.addWeeks(DataModel.state.currentWeek, -1);
+    Storage.save(DataModel.state);
+    Renderer.renderAll(DataModel.state.currentWeek);
+  },
+
+  nextWeek() {
+    DataModel.state.currentWeek = WeekUtils.addWeeks(DataModel.state.currentWeek, 1);
+    Storage.save(DataModel.state);
+    Renderer.renderAll(DataModel.state.currentWeek);
+  },
+
+  goToToday() {
+    const now = WeekUtils.getISOWeek(new Date());
+    DataModel.state.currentWeek = WeekUtils.formatWeekStr(now.year, now.week);
+    Storage.save(DataModel.state);
+    Renderer.renderAll(DataModel.state.currentWeek);
+  },
+
+  addTask(person) {
+    const task = DataModel.addTask(DataModel.state.currentWeek, person);
+    Renderer.renderBoard(DataModel.state.currentWeek);
+    // Start editing the new card's name field
+    setTimeout(() => {
+      const card = document.querySelector(`.task-card[data-task-id="${task.id}"]`);
+      if (card) {
+        const nameEl = card.querySelector('[data-field="name"]');
+        if (nameEl) Editor.startEdit(nameEl, card);
+      }
+    }, 100);
+  },
+
+  deleteTask(taskId) {
+    DataModel.deleteTask(taskId);
+    Renderer.renderBoard(DataModel.state.currentWeek);
+    Toast.show('浠诲姟宸插垹闄?);
+  },
+
+  copyFromPrev() {
+    const count = DataModel.copyIncompleteFromPrev(DataModel.state.currentWeek);
+    if (count > 0) {
+      Renderer.renderAll(DataModel.state.currentWeek);
+      Toast.show(`宸插鍒?${count} 涓湭瀹屾垚浠诲姟`);
+    } else {
+      Toast.show('涓婂懆娌℃湁鏈畬鎴愮殑浠诲姟');
+    }
+  },
+};
+
+// ======================================================================
+// App 鈥?Entry point
+// ======================================================================
+const App = {
+  async init() {
+    // Load local first for instant render
+    const state = Storage.load();
+    DataModel.init(state);
+    this.bindToolbar();
+    this.bindBoardDelegation();
+    this.bindSettings();
+    this.bindGlobalKeys();
+    Renderer.renderAll(DataModel.state.currentWeek);
+
+    // Then attempt remote sync
+    if (GistSync.isConfigured()) {
+      const merged = await Storage.loadAsync();
+      if (merged !== state) {
+        DataModel.init(merged);
+        Renderer.renderAll(DataModel.state.currentWeek);
+      }
+    } else {
+      SyncStatus.notConfigured();
+    }
+  },
+
+  bindToolbar() {
+    document.getElementById('btn-prev-week').addEventListener('click', () => Actions.previousWeek());
+    document.getElementById('btn-next-week').addEventListener('click', () => Actions.nextWeek());
+    document.getElementById('btn-today').addEventListener('click', () => Actions.goToToday());
+    document.getElementById('btn-copy-prev').addEventListener('click', () => Actions.copyFromPrev());
+  },
+
+  bindBoardDelegation() {
+    document.getElementById('board').addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-add-person');
+      if (btn) {
+        Actions.addTask(btn.dataset.person);
+      }
+    });
+  },
+
+  bindSettings() {
+    const overlay = document.getElementById('settings-overlay');
+    const gistInput = document.getElementById('cfg-gist-id');
+    const tokenInput = document.getElementById('cfg-token');
+
+    // Open settings
+    document.getElementById('btn-settings').addEventListener('click', () => {
+      const cfg = GistSync.loadConfig();
+      gistInput.value = cfg.gistId || '';
+      tokenInput.value = cfg.token || '';
+      overlay.classList.add('show');
+    });
+
+    // Close
+    document.getElementById('btn-cancel-settings').addEventListener('click', () => {
+      overlay.classList.remove('show');
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.remove('show');
+    });
+
+    // Save
+    document.getElementById('btn-save-settings').addEventListener('click', async () => {
+      const gistId = gistInput.value.trim();
+      const token = tokenInput.value.trim();
+      if (!gistId || !token) { Toast.show('璇疯緭鍏?Gist ID 鍜?Token'); return; }
+      GistSync.saveConfig({ gistId, token });
+      overlay.classList.remove('show');
+      SyncStatus.showConfigured();
+      SyncStatus.syncing();
+      // Push current state and re-sync
+      const ok = await GistSync.push(DataModel.state);
+      if (ok) {
+        SyncStatus.configured();
+        Toast.show('鍚屾閰嶇疆鎴愬姛');
+      } else {
+        SyncStatus.error('涓婁紶澶辫触锛岃妫€鏌?Gist ID 鍜?Token');
+      }
+    });
+
+    // Disconnect
+    document.getElementById('btn-disconnect').addEventListener('click', () => {
+      if (confirm('纭畾鏂紑鍚屾锛熶簯绔暟鎹笉浼氳鍒犻櫎銆?)) {
+        GistSync.saveConfig({ gistId: '', token: '' });
+        overlay.classList.remove('show');
+        SyncStatus.notConfigured();
+        Toast.show('宸叉柇寮€鍚屾');
+      }
+    });
+  },
+
+  bindGlobalKeys() {
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        Actions.addTask(C.MEMBERS[0]);
+      }
+      if (e.key === 'Escape') {
+        if (Editor.currentField) {
+          Editor.cancelEdit();
+        } else {
+          document.getElementById('settings-overlay').classList.remove('show');
+        }
+      }
+    });
+  },
+};
+
+// Boot
+document.addEventListener('DOMContentLoaded', () => App.init());
+</script>
+</body>
+</html>
