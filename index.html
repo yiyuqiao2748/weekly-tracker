@@ -1059,14 +1059,7 @@ const Editor = {
     }
 
     if (field === 'progress') {
-      const input = document.createElement('input');
-      input.type = 'number'; input.min = 0; input.max = 100; input.step = 5;
-      input.value = raw;
-      el.innerHTML = '';
-      el.appendChild(input);
-      this._bindInputEvents(input, el, card);
-      input.focus();
-      input.select();
+      this._startProgressDrag(el, card, raw);
       return;
     }
 
@@ -1173,12 +1166,82 @@ const Editor = {
     }
   },
 
+  _dragTaskId: null,
+  _dragValue: 0,
+  _dragStartX: 0,
+
+  _startProgressDrag(el, card, initialValue) {
+    const taskId = card.dataset.taskId;
+    this._dragTaskId = taskId;
+    this._dragValue = initialValue;
+    el.classList.add('editing');
+
+    const onDown = (e) => {
+      e.preventDefault();
+      this._dragStartX = e.clientX;
+      this._dragValue = initialValue;
+      // highlight bar
+      const inner = el.querySelector('.prog-inner');
+      if (inner) inner.style.filter = 'brightness(1.2)';
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    };
+
+    const onMove = (e) => {
+      const dx = e.clientX - this._dragStartX;
+      const step = Math.round(dx / 10); // 10px = 5%
+      let newVal = initialValue + step * 5;
+      newVal = Math.max(0, Math.min(100, newVal));
+      if (newVal !== this._dragValue) {
+        this._dragValue = newVal;
+        this._updateProgressBar(el, newVal);
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      const inner = el.querySelector('.prog-inner');
+      if (inner) inner.style.filter = '';
+      this._commit(card, el, this._dragValue);
+    };
+
+    el.addEventListener('pointerdown', onDown);
+    // Store cleanup ref on the element
+    el._dragCleanup = () => {
+      el.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+    };
+  },
+
+  _updateProgressBar(el, pct) {
+    let color = 'var(--progress-mid)';
+    if (pct >= 70) color = 'var(--progress-high)';
+    else if (pct <= 30 && pct > 0) color = 'var(--progress-low)';
+    else if (pct === 0) color = 'transparent';
+    const inner = el.querySelector('.prog-inner');
+    if (inner) {
+      inner.style.width = pct + '%';
+      inner.style.background = color;
+      inner.style.minWidth = pct === 0 ? '0' : '';
+    }
+    const label = el.querySelector('.prog-label');
+    if (label) label.textContent = pct + '%';
+  },
+
   cancelEdit(restore = true) {
     if (!this.currentField) return;
     const el = this.currentField;
     const card = this.currentCard;
+    // Clean up drag listeners if this was a progress bar
+    if (el._dragCleanup) {
+      el._dragCleanup();
+      el._dragCleanup = null;
+    }
     this.currentField = null;
     this.currentCard = null;
+    this._dragTaskId = null;
     el.classList.remove('editing');
     if (restore && card) {
       Renderer.patchCard(card);
