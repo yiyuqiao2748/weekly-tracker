@@ -74,8 +74,9 @@ body {
   opacity: 0; transition: opacity 0.3s;
   background: #333; color: #fff;
   box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  display: flex; align-items: center;
 }
-#toast.show { opacity: 1; }
+#toast.show { opacity: 1; pointer-events: auto; }
 
 /* ===== Main grid ===== */
 #board {
@@ -338,6 +339,50 @@ body {
   50% { box-shadow: 0 4px 32px rgba(26,115,232,0.6); }
 }
 
+/* ===== Search & Filter ===== */
+.search-input {
+  font-family: inherit; font-size: 12px;
+  padding: 5px 10px; width: 140px;
+  border: 1px solid #d0d0d0; border-radius: 4px;
+  background: #fff; outline: none; color: #444;
+  transition: border-color 0.15s;
+}
+.search-input:focus { border-color: #1a73e8; }
+.search-input::placeholder { color: #bbb; }
+
+.status-filters { display: flex; gap: 4px; }
+.filter-btn {
+  font-family: inherit; font-size: 11px;
+  padding: 3px 10px; border-radius: 10px;
+  border: 1px solid #d0d0d0; background: #fff;
+  color: #666; cursor: pointer; white-space: nowrap;
+  transition: all 0.15s;
+}
+.filter-btn:hover { background: #f0f0f0; border-color: #bbb; }
+.filter-btn.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+
+/* ===== Stats Bar ===== */
+#stats-bar {
+  display: flex; gap: 12px; padding: 8px 16px;
+  background: #fff; border-bottom: 1px solid #e8e8e8;
+  flex-wrap: wrap; align-items: center;
+  font-size: 12px; color: #666;
+}
+.stat-item {
+  display: flex; align-items: center; gap: 4px;
+  background: #f8f9fa; padding: 4px 10px; border-radius: 6px;
+}
+.stat-item .stat-value { font-weight: 700; color: #333; }
+.stat-item .stat-label { color: #999; }
+.stat-divider { width: 1px; height: 16px; background: #e0e0e0; }
+.stat-person {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 6px; background: #f8f9fa;
+}
+.stat-person .stat-dot { width: 6px; height: 6px; border-radius: 50%; }
+.stat-person .stat-done { color: #059669; font-weight: 600; }
+.stat-person .stat-total { color: #999; }
+
 /* ===== Responsive ===== */
 @media (max-width: 1000px) { #board { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px)  { #board { grid-template-columns: 1fr; } }
@@ -353,11 +398,20 @@ body {
   <span class="sep"></span>
   <button type="button" id="btn-copy-prev">从上周复制未完成任务</button>
   <span class="sep"></span>
+  <input type="text" id="search-input" class="search-input" placeholder="搜索任务..." />
+  <div id="status-filters" class="status-filters">
+    <button type="button" class="filter-btn active" data-filter="all">全部</button>
+    <button type="button" class="filter-btn" data-filter="未开始">未开始</button>
+    <button type="button" class="filter-btn" data-filter="进行中">进行中</button>
+    <button type="button" class="filter-btn" data-filter="已完成">已完成</button>
+  </div>
+  <span class="sep"></span>
   <span id="sync-status"><span class="sync-dot"></span><span id="sync-text">未配置同步</span></span>
   <button type="button" id="btn-settings" title="同步设置">⚙</button>
 </div>
 
 <div id="toast"></div>
+<div id="stats-bar"></div>
 <div id="board"></div>
 
 <div id="save-bar">
@@ -400,11 +454,36 @@ const C = {
 };
 
 // ======================================================================
+// FilterState — Search & status filter
+// ======================================================================
+const FilterState = {
+  search: '',
+  statusFilter: 'all', // 'all' | '未开始' | '进行中' | '已完成'
+
+  apply(tasks) {
+    let result = tasks;
+    if (this.statusFilter !== 'all') {
+      result = result.filter(t => t.status === this.statusFilter);
+    }
+    if (this.search) {
+      const q = this.search.toLowerCase();
+      result = result.filter(t =>
+        (t.name || '').toLowerCase().includes(q) ||
+        (t.notes || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  },
+};
+
+// ======================================================================
 // GistSync — GitHub Gist data sync
 // ======================================================================
 const GistSync = {
   CONFIG_KEY: 'renderTrackerSyncConfig',
   DEFAULT_GIST_ID: '1c847a7d6d0e61fb090eb581d5e988b7',
+  // SECURITY: TODO — 这个 token 不应硬编码在源码中，待迁移到用户输入方式。
+  // 当前仅限内部使用，切勿将此文件公开托管。
   DEFAULT_TOKEN: 'ghp_' + 'Zhox7ql0pCmgMR03n93sNVclmUj9Up1I7Uwq',
 
   loadConfig() {
@@ -594,6 +673,26 @@ const Toast = {
     el.textContent = msg; el.classList.add('show');
     clearTimeout(this._timer);
     this._timer = setTimeout(() => el.classList.remove('show'), 2000);
+  },
+  showUndo(msg, onUndo, timeoutMs = 5000) {
+    const el = document.getElementById('toast');
+    el.innerHTML = '';
+    const span = document.createElement('span');
+    span.textContent = msg;
+    el.appendChild(span);
+    const btn = document.createElement('button');
+    btn.textContent = '撤销';
+    btn.style.cssText = 'background:#fff;color:#1a73e8;border:1px solid #1a73e8;border-radius:4px;padding:2px 10px;margin-left:10px;cursor:pointer;font-size:12px;font-weight:600;';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearTimeout(this._timer);
+      el.classList.remove('show');
+      onUndo();
+    });
+    el.appendChild(btn);
+    el.classList.add('show');
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => el.classList.remove('show'), timeoutMs);
   }
 };
 
@@ -796,13 +895,6 @@ const DataModel = {
     return task;
   },
 
-  deleteTask(taskId) {
-    const idx = this.state.tasks.findIndex(t => t.id === taskId);
-    if (idx === -1) return;
-    this.state.tasks.splice(idx, 1);
-    this._save();
-  },
-
   updateField(taskId, field, value) {
     const task = this.state.tasks.find(t => t.id === taskId);
     if (!task) return;
@@ -854,6 +946,7 @@ const DataModel = {
 const Renderer = {
   renderAll(weekStr) {
     this.renderToolbar(weekStr);
+    this.renderStats(weekStr);
     this.renderBoard(weekStr);
   },
 
@@ -862,11 +955,33 @@ const Renderer = {
       `${weekStr.replace('-W', '年第')}周 <span class="date-range">(${WeekUtils.formatDateRange(weekStr)})</span>`;
   },
 
+  renderStats(weekStr) {
+    const allTasks = DataModel.getTasks(weekStr);
+    const filtered = FilterState.apply(allTasks);
+    const total = filtered.length;
+    const done = filtered.filter(t => t.status === '已完成').length;
+    const rate = total > 0 ? Math.round(done / total * 100) : 0;
+
+    let html = `<div class="stat-item"><span class="stat-value">${total}</span><span class="stat-label">任务</span></div>`;
+    html += `<div class="stat-item"><span class="stat-value" style="color:${rate >= 80 ? '#059669' : rate >= 50 ? '#d97706' : '#dc2626'}">${rate}%</span><span class="stat-label">完成率</span></div>`;
+    html += `<div class="stat-item"><span class="stat-value">${done}/${total}</span><span class="stat-label">已完成</span></div>`;
+    html += `<div class="stat-divider"></div>`;
+
+    C.MEMBERS.forEach((person, i) => {
+      const tasks = FilterState.apply(DataModel.getTasksByPerson(weekStr, person));
+      const personDone = tasks.filter(t => t.status === '已完成').length;
+      html += `<div class="stat-person"><span class="stat-dot ${C.DOT_CLASSES[i]}"></span><span>${person}</span><span class="stat-done">${personDone}</span><span class="stat-total">/${tasks.length}</span></div>`;
+    });
+
+    document.getElementById('stats-bar').innerHTML = html;
+  },
+
   renderBoard(weekStr) {
     const board = document.getElementById('board');
     let html = '';
     C.MEMBERS.forEach(person => {
-      const tasks = DataModel.getTasksByPerson(weekStr, person);
+      const allTasks = DataModel.getTasksByPerson(weekStr, person);
+      const tasks = FilterState.apply(allTasks);
       html += this._renderColumn(person, tasks);
     });
     board.innerHTML = html;
@@ -910,7 +1025,6 @@ const Renderer = {
     const pcls = C.PRIO_CLASSES[task.priority] || '';
     const scls = C.STATUS_CLASSES[task.status] || '';
     const name = task.name || '<span class="placeholder">点击输入任务名</span>';
-    const dateStr = this._formatDatePair(task.startDate, task.dueDate);
     const notes = task.notes || '<span class="placeholder">备注</span>';
 
     return `
@@ -925,7 +1039,9 @@ const Renderer = {
         <span class="status-badge ${scls} editable" data-field="status">${task.status}</span>
       </div>
       <div class="card-row">
-        <span class="date-range editable" data-field="startDate">${dateStr}</span>
+        <span class="date-range editable" data-field="startDate" title="开始日期">${this._formatSingleDate(task.startDate, '开始')}</span>
+        <span style="color:#ccc;font-size:11px">—</span>
+        <span class="date-range editable" data-field="dueDate" title="结束日期">${this._formatSingleDate(task.dueDate, '结束')}</span>
       </div>
       <div class="card-row">
         <span class="notes editable" data-field="notes">${notes}</span>
@@ -952,6 +1068,11 @@ const Renderer = {
     if (!s) return '~' + e;
     if (!e) return s + '~';
     return s + ' — ' + e;
+  },
+
+  _formatSingleDate(dateStr, label) {
+    const s = WeekUtils.formatShortDate(dateStr);
+    return s || `<span class="placeholder">${label}</span>`;
   },
 
   _bindCardEvents(card) {
@@ -1007,9 +1128,11 @@ const Renderer = {
       statusEl.dataset.field = 'status';
     }
 
-    // Update date
-    const dateEl = card.querySelector('[data-field="startDate"]');
-    if (dateEl) dateEl.innerHTML = this._formatDatePair(task.startDate, task.dueDate);
+    // Update dates
+    const startDateEl = card.querySelector('[data-field="startDate"]');
+    if (startDateEl) startDateEl.innerHTML = this._formatSingleDate(task.startDate, '开始');
+    const dueDateEl = card.querySelector('[data-field="dueDate"]');
+    if (dueDateEl) dueDateEl.innerHTML = this._formatSingleDate(task.dueDate, '结束');
 
     // Update notes
     const notesEl = card.querySelector('[data-field="notes"]');
@@ -1063,7 +1186,7 @@ const Editor = {
       return;
     }
 
-    if (field === 'startDate') {
+    if (field === 'startDate' || field === 'dueDate') {
       const input = document.createElement('input');
       input.type = 'date';
       if (raw) input.value = raw;
@@ -1149,13 +1272,7 @@ const Editor = {
       return;
     }
 
-    // For startDate, also save dueDate from the same date-pair UI
-    if (field === 'startDate') {
-      DataModel.updateField(taskId, 'startDate', parsed);
-      // Just update startDate, keep dueDate as-is for simplicity
-    } else {
-      DataModel.updateField(taskId, field, parsed);
-    }
+    DataModel.updateField(taskId, field, parsed);
 
     // Re-fetch and patch
     const updated = DataModel.state.tasks.find(t => t.id === taskId);
@@ -1262,6 +1379,7 @@ const Editor = {
         body.classList.toggle('empty', count === 0);
       }
     });
+    Renderer.renderStats(weekStr);
   },
 };
 
@@ -1290,7 +1408,7 @@ const Actions = {
 
   addTask(person) {
     const task = DataModel.addTask(DataModel.state.currentWeek, person);
-    Renderer.renderBoard(DataModel.state.currentWeek);
+    Renderer.renderAll(DataModel.state.currentWeek);
     // Start editing the new card's name field
     setTimeout(() => {
       const card = document.querySelector(`.task-card[data-task-id="${task.id}"]`);
@@ -1302,9 +1420,17 @@ const Actions = {
   },
 
   deleteTask(taskId) {
-    DataModel.deleteTask(taskId);
-    Renderer.renderBoard(DataModel.state.currentWeek);
-    Toast.show('任务已删除');
+    const idx = DataModel.state.tasks.findIndex(t => t.id === taskId);
+    if (idx === -1) return;
+    const deleted = DataModel.state.tasks.splice(idx, 1)[0];
+    DataModel._save();
+    Renderer.renderAll(DataModel.state.currentWeek);
+    Toast.showUndo('任务已删除', () => {
+      DataModel.state.tasks.push(deleted);
+      DataModel._save();
+      Renderer.renderAll(DataModel.state.currentWeek);
+      Toast.show('已恢复任务');
+    });
   },
 
   copyFromPrev() {
@@ -1347,6 +1473,27 @@ const App = {
     document.getElementById('btn-next-week').addEventListener('click', () => Actions.nextWeek());
     document.getElementById('btn-today').addEventListener('click', () => Actions.goToToday());
     document.getElementById('btn-copy-prev').addEventListener('click', () => Actions.copyFromPrev());
+
+    // Search
+    const searchInput = document.getElementById('search-input');
+    let searchTimer;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        FilterState.search = searchInput.value.trim();
+        Renderer.renderAll(DataModel.state.currentWeek);
+      }, 200);
+    });
+
+    // Status filters
+    document.getElementById('status-filters').addEventListener('click', (e) => {
+      const btn = e.target.closest('.filter-btn');
+      if (!btn) return;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      FilterState.statusFilter = btn.dataset.filter;
+      Renderer.renderAll(DataModel.state.currentWeek);
+    });
   },
 
   bindBoardDelegation() {
