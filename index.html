@@ -4,410 +4,700 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>效果图部门 · 周任务进度表</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* ===== Reset ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
-body {
-  font-family: "Microsoft YaHei", "微软雅黑", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 13px;
-  background: #eef1f5;
-  color: #222;
-  display: flex; flex-direction: column;
-}
 
-/* ===== Variables ===== */
+/* ===== Design tokens ===== */
 :root {
-  --prio-high-bg: #FEE2E2; --prio-high-text: #DC2626;
-  --prio-med-bg:  #FEF3C7; --prio-med-text:  #D97706;
-  --prio-low-bg:  #D1FAE5; --prio-low-text:  #059669;
-  --status-not-bg:  #F3F4F6; --status-not-text:  #6B7280;
-  --status-prog-bg: #DBEAFE; --status-prog-text: #2563EB;
-  --status-done-bg: #D1FAE5; --status-done-text: #059669;
-  --progress-bg: #e5e7eb;
-  --progress-low: #ef4444;
-  --progress-mid: #3b82f6;
-  --progress-high: #10b981;
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  --card-hover-shadow: 0 3px 12px rgba(0,0,0,0.12);
+  --f-display: "Noto Serif SC", "Songti SC", "STSong", Georgia, serif;
+  --f-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+  --f-mono: "IBM Plex Mono", "SFMono-Regular", "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  --paper: #F1EEE6;
+  --paper-raised: #FBF9F5;
+  --paper-sunk: #E6E1D6;
+  --grid: rgba(31, 93, 124, .055);
+  --grid-bold: rgba(31, 93, 124, .095);
+  --ink: #1C1A16;
+  --ink-2: #555046;
+  --ink-3: #6E6659;
+  --ink-4: #A69C8B;
+  --hair: #DCD5C7;
+  --hair-strong: #C3B9A6;
+
+  --blueprint: #1F5D7C;
+  --blueprint-2: #2C7BA0;
+  --blueprint-soft: rgba(31, 93, 124, .10);
+  --rust: #B0451D;
+  --amber: #8A6310;
+  --sage: #4C6B4E;
+
+  --shadow-1: 0 1px 0 rgba(28,26,22,.03), 0 1px 3px rgba(28,26,22,.05);
+  --shadow-2: 0 2px 4px rgba(28,26,22,.06), 0 12px 30px rgba(28,26,22,.11);
+
+  --ease: cubic-bezier(.22, .61, .36, 1);
+  --tint-ink: rgba(28, 26, 22, .04);
+  --hatch: rgba(76, 107, 78, .09);
 }
 
-/* ===== Toolbar ===== */
+body[data-theme="blueprint"] {
+  --paper: #0D1E29;
+  --paper-raised: #132837;
+  --paper-sunk: #0A1720;
+  --grid: rgba(124, 191, 217, .07);
+  --grid-bold: rgba(124, 191, 217, .115);
+  --ink: #E4EEF4;
+  --ink-2: #A9BECB;
+  --ink-3: #7690A0;
+  --ink-4: #4E6675;
+  --hair: #25404F;
+  --hair-strong: #33566A;
+  --blueprint: #7CBFD9;
+  --blueprint-2: #9DD3E8;
+  --blueprint-soft: rgba(124, 191, 217, .13);
+  --rust: #DE8862;
+  --amber: #DDB35C;
+  --sage: #8FBF8E;
+  --shadow-1: 0 1px 0 rgba(0,0,0,.22);
+  --shadow-2: 0 2px 6px rgba(0,0,0,.34), 0 14px 34px rgba(0,0,0,.42);
+  --tint-ink: rgba(124, 191, 217, .05);
+  --hatch: rgba(143, 191, 142, .14);
+}
+
+/* ===== Base ===== */
+body {
+  font-family: var(--f-body);
+  font-size: 13px;
+  color: var(--ink);
+  display: flex; flex-direction: column;
+  background-color: var(--paper);
+  /* 制图网格：细格 18px + 粗格 144px */
+  background-image:
+    linear-gradient(var(--grid-bold) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-bold) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 144px 144px, 144px 144px, 18px 18px, 18px 18px;
+  transition: background-color .35s var(--ease), color .35s var(--ease);
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: var(--blueprint); color: var(--paper-raised); }
+
+/* mono annotation utility */
+.anno {
+  font-family: var(--f-mono);
+  font-size: 10px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ===== Title block (toolbar) ===== */
 #toolbar {
   flex-shrink: 0;
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 16px;
-  background: #fff;
-  border-bottom: 1px solid #dde;
+  display: flex; align-items: center; gap: 16px;
+  padding: 11px 20px;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--hair-strong);
+  position: sticky; top: 0;
   z-index: 100;
   flex-wrap: wrap;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 #toolbar .sep { flex: 1; }
+
+#brand { display: flex; align-items: baseline; gap: 10px; padding-right: 18px; border-right: 1px solid var(--hair); }
+#brand .mark {
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: .16em;
+  color: var(--paper-raised); background: var(--ink);
+  padding: 3px 6px; text-transform: uppercase; align-self: center;
+}
+#brand .name { font-family: var(--f-display); font-size: 15px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
+
 #toolbar button {
-  font-family: inherit; font-size: 12px;
-  padding: 5px 14px;
-  border: 1px solid #d0d0d0;
-  border-radius: 4px;
-  background: #fff; cursor: pointer;
-  white-space: nowrap; color: #444;
-  transition: all 0.15s;
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .05em;
+  padding: 5px 12px;
+  border: 1px solid var(--hair-strong);
+  border-radius: 0;
+  background: transparent; cursor: pointer;
+  white-space: nowrap; color: var(--ink-2);
+  transition: color .16s var(--ease), border-color .16s var(--ease), background .16s var(--ease);
 }
-#toolbar button:hover { background: #f0f0f0; border-color: #bbb; }
-#toolbar button:active { background: #e0e0e0; }
-#toolbar button.accent {
-  background: #1a73e8; color: #fff; border-color: #1a73e8;
-  font-weight: 500;
+#toolbar button:hover { color: var(--blueprint); border-color: var(--blueprint); background: var(--blueprint-soft); }
+#toolbar button:active { transform: translateY(1px); }
+#toolbar button.accent { background: var(--ink); color: var(--paper-raised); border-color: var(--ink); }
+#toolbar button.accent:hover { background: var(--blueprint); border-color: var(--blueprint); }
+#toolbar .week-nav { font-size: 10px; padding: 5px 9px; color: var(--ink-3); }
+#toolbar .week-nav:hover { color: var(--blueprint); }
+
+.week-group { display: flex; align-items: center; gap: 11px; }
+#week-label {
+  font-family: var(--f-display); font-size: 20px; font-weight: 600;
+  line-height: 1.05; letter-spacing: .01em; min-width: 148px;
+  display: flex; flex-direction: column; gap: 3px;
 }
-#toolbar button.accent:hover { background: #1557b0; }
-#toolbar .week-nav { font-size: 16px; padding: 4px 10px; }
-#toolbar .week-label {
-  font-size: 15px; font-weight: 600; min-width: 240px; text-align: center;
+#week-label .wk-main { display: flex; align-items: center; }
+#week-label .date-range {
+  font-family: var(--f-mono); font-size: 10px; font-weight: 400;
+  letter-spacing: .09em; color: var(--ink-3);
 }
-#toolbar .week-label .date-range { font-weight: 400; color: #888; font-size: 12px; }
+#week-label .wk-flag {
+  font-family: var(--f-mono); font-style: normal; font-size: 8.5px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--paper-raised); background: var(--blueprint);
+  padding: 2px 5px; margin-left: 8px; vertical-align: 4px;
+}
 
 /* ===== Toast ===== */
 #toast {
-  position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-  padding: 8px 20px; border-radius: 6px; font-size: 13px;
+  position: fixed; top: 74px; left: 50%; transform: translate(-50%, -6px);
+  padding: 8px 16px; font-size: 12px;
+  font-family: var(--f-mono); letter-spacing: .04em;
   z-index: 9999; pointer-events: none;
-  opacity: 0; transition: opacity 0.3s;
-  background: #333; color: #fff;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  opacity: 0; transition: opacity .25s var(--ease), transform .25s var(--ease);
+  background: var(--ink); color: var(--paper);
+  border-left: 3px solid var(--blueprint);
+  box-shadow: var(--shadow-2);
   display: flex; align-items: center;
 }
-#toast.show { opacity: 1; pointer-events: auto; }
+#toast.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 
-/* ===== Main grid ===== */
+/* ===== Board ===== */
 #board {
   flex: 1; overflow-y: auto; overflow-x: auto;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  padding: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  padding: 20px 20px 96px;
   align-content: start;
 }
 
-/* ===== Column ===== */
+/* ===== Column — 一张图纸 ===== */
 .column {
-  background: #fff;
-  border-radius: 8px;
+  position: relative;
+  background: var(--paper-raised);
+  border: 1px solid var(--hair-strong);
   display: flex; flex-direction: column;
-  min-width: 200px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  min-width: 0;
+  box-shadow: var(--shadow-1);
+  transition: box-shadow .22s var(--ease), border-color .22s var(--ease);
 }
+.column:hover { box-shadow: var(--shadow-2); }
+/* 裁切标记 */
+.column::before, .column::after {
+  content: ''; position: absolute; width: 10px; height: 10px;
+  pointer-events: none; opacity: .5;
+  border-color: var(--blueprint); border-style: solid; border-width: 0;
+}
+.column::before { top: -5px; left: -5px; border-top-width: 1px; border-left-width: 1px; }
+.column::after { bottom: -5px; right: -5px; border-bottom-width: 1px; border-right-width: 1px; }
+
 .column-header {
-  padding: 10px 14px;
-  border-bottom: 2px solid #e8e8e8;
-  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 13px 10px;
+  border-bottom: 1px solid var(--hair-strong);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
   flex-shrink: 0;
+  background: linear-gradient(180deg, var(--tint-ink), transparent);
+}
+.column-header .ph-left { min-width: 0; }
+.column-header .sht {
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); display: block; margin-bottom: 3px;
 }
 .column-header .person-name {
-  font-size: 15px; font-weight: 700;
-  display: flex; align-items: center; gap: 6px;
+  font-family: var(--f-display);
+  font-size: 16px; font-weight: 600; letter-spacing: .01em;
+  display: flex; align-items: center; gap: 7px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .column-header .person-name .dot {
-  width: 10px; height: 10px; border-radius: 50%;
+  width: 7px; height: 7px; border-radius: 0; flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.06);
 }
-.dot-c0 { background: #6366f1; }
-.dot-c1 { background: #f59e0b; }
-.dot-c2 { background: #10b981; }
-.dot-c3 { background: #ec4899; }
+.dot-c0 { background: var(--blueprint); }
+.dot-c1 { background: var(--amber); }
+.dot-c2 { background: var(--sage); }
+.dot-c3 { background: var(--rust); }
 
+.column-header .ph-right { text-align: right; flex-shrink: 0; }
 .column-header .task-count {
-  font-size: 12px; color: #999; font-weight: 400;
-  background: #f3f4f6; padding: 2px 8px; border-radius: 10px;
+  font-family: var(--f-mono); font-size: 15px; font-weight: 500; color: var(--ink);
+  line-height: 1;
 }
+.column-header .task-count i {
+  font-style: normal; font-size: 9px; letter-spacing: .1em; color: var(--ink-3);
+  margin-left: 2px;
+}
+.column-header .ph-sub {
+  display: block; font-family: var(--f-mono); font-size: 9px; letter-spacing: .08em;
+  color: var(--ink-3); margin-top: 4px;
+}
+.column-header .ph-sub b { color: var(--sage); font-weight: 500; }
+
 .column-body {
-  flex: 1; overflow-y: auto;
-  padding: 8px 6px;
-  display: flex; flex-direction: column; gap: 8px;
-  min-height: 60px;
+  flex: 0 1 auto; overflow-y: auto;
+  padding: 12px 10px;
+  display: flex; flex-direction: column; gap: 10px;
+  min-height: 84px;
+}
+.column-body.empty {
+  border: 1px dashed var(--hair-strong);
+  margin: 12px 10px;
+  min-height: 84px;
 }
 .column-body.empty::after {
-  content: '暂无任务';
-  text-align: center; color: #ccc; font-size: 12px;
-  padding: 20px 0;
+  content: '待补充 / TO BE ADDED';
+  text-align: center; color: var(--ink-3);
+  font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .12em;
+  padding: 30px 0;
 }
-.column-footer {
-  padding: 6px 8px 10px;
-  flex-shrink: 0;
-}
+.column-footer { padding: 0 10px 11px; flex-shrink: 0; }
 .column-footer button {
-  width: 100%; padding: 6px;
-  border: 1px dashed #d0d0d0; border-radius: 6px;
-  background: transparent; color: #999; cursor: pointer;
-  font-family: inherit; font-size: 12px;
-  transition: all 0.15s;
+  width: 100%; padding: 7px;
+  border: 1px dashed var(--hair-strong); border-radius: 0;
+  background: transparent; color: var(--ink-3); cursor: pointer;
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .1em;
+  transition: color .16s var(--ease), border-color .16s var(--ease), background .16s var(--ease);
 }
 .column-footer button:hover {
-  border-color: #1a73e8; color: #1a73e8; background: #e8f0fe;
+  border-color: var(--blueprint); color: var(--blueprint); background: var(--blueprint-soft);
+  border-style: solid;
 }
 
 /* ===== Task Card ===== */
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: none; }
+}
 .task-card {
-  background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 6px;
-  padding: 8px 10px;
-  cursor: default;
-  transition: box-shadow 0.2s, border-color 0.2s;
   position: relative;
-  box-shadow: var(--card-shadow);
+  background: var(--paper-raised);
+  border: 1px solid var(--hair);
+  padding: 9px 10px 10px;
+  cursor: default;
+  transition: border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+  animation: card-in .3s var(--ease) both;
 }
-.task-card:hover {
-  box-shadow: var(--card-hover-shadow);
-  border-color: #d0d0d0;
+/* 左侧引线：hover 时展开 */
+.task-card::before {
+  content: ''; position: absolute; left: -1px; top: -1px; bottom: -1px; width: 2px;
+  background: var(--blueprint);
+  transform: scaleY(0); transform-origin: top;
+  transition: transform .22s var(--ease);
 }
-.task-card .card-row {
-  display: flex; align-items: center; gap: 6px;
-  margin-bottom: 4px;
+.task-card:hover { border-color: var(--hair-strong); box-shadow: var(--shadow-1); }
+.task-card:hover::before { transform: scaleY(1); }
+.task-card[data-status="已完成"] {
+  background-image: repeating-linear-gradient(45deg, var(--hatch) 0 1px, transparent 1px 8px);
 }
+.task-card .card-row { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
 .task-card .card-row:last-child { margin-bottom: 0; }
+.task-card .card-row.wrap { flex-wrap: wrap; }
+.task-card .spacer { flex: 1; }
+
 .task-card .task-name {
-  font-weight: 600; font-size: 13px;
-  flex: 1;
-  color: #222;
+  font-weight: 600; font-size: 13.5px; line-height: 1.4;
+  flex: 1; min-width: 0; color: var(--ink); letter-spacing: .01em;
 }
 .task-card .task-name.editable { cursor: text; }
-.task-card .task-name .placeholder { color: #ccc; font-weight: 400; }
+.task-card .task-name .placeholder { color: var(--ink-3); font-weight: 400; }
 
-/* Priority badge */
+/* Priority — 引出线标签 */
 .prio-badge {
-  display: inline-block; padding: 1px 7px; border-radius: 3px;
-  font-size: 11px; font-weight: 600; flex-shrink: 0;
+  font-family: var(--f-mono); font-size: 9.5px; font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase;
+  padding: 1.5px 5px 1.5px 0; flex-shrink: 0;
+  border-bottom: 1px solid currentColor;
+  transition: background .16s var(--ease);
 }
-.prio-high { background: var(--prio-high-bg); color: var(--prio-high-text); }
-.prio-med  { background: var(--prio-med-bg);  color: var(--prio-med-text);  }
-.prio-low  { background: var(--prio-low-bg);  color: var(--prio-low-text);  }
+.prio-badge::before {
+  content: attr(data-code);
+  margin-right: 5px; opacity: .55; letter-spacing: .06em;
+}
+.prio-high { color: var(--rust); }
+.prio-med  { color: var(--amber); }
+.prio-low  { color: var(--sage); }
+.prio-badge:hover { background: var(--tint-ink); }
 
-/* Progress bar */
-.prog-outer {
-  flex: 1; height: 14px; background: var(--progress-bg);
-  border-radius: 3px; overflow: hidden;
-  position: relative; min-width: 40px;
-  touch-action: none;
+/* Progress — 尺寸标注线 */
+.dim {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 0;
+  touch-action: none; user-select: none;
 }
-.prog-inner {
-  height: 100%; border-radius: 3px;
-  transition: width 0.4s ease;
+.dim-line {
+  flex: 1; min-width: 34px; position: relative;
+  display: flex; align-items: center; height: 15px;
 }
-.prog-label {
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 600; line-height: 1;
-  color: #333; text-shadow: 0 0 2px #fff;
+.dim-track {
+  flex: 1; position: relative; height: 2px;
+  background: var(--paper-sunk);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  cursor: ew-resize;
+  transition: height .16s var(--ease);
 }
-.prog-outer.editing {
-  height: 20px;
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
-  border-radius: 4px;
+.dim:hover .dim-track, .dim.editing .dim-track { height: 6px; }
+.dim-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; display: block;
+  background: var(--blueprint);
+  transition: width .35s var(--ease), background .25s var(--ease);
 }
-.prog-outer.editing .prog-label {
-  font-size: 12px; font-weight: 700;
+.dim.dragging .dim-fill { transition: none; }
+.dim-thumb {
+  position: absolute; top: 50%; width: 9px; height: 9px; display: block;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--paper-raised);
+  border: 1.5px solid var(--blueprint);
+  opacity: 0; transition: opacity .16s var(--ease), scale .16s var(--ease);
+  scale: .7;
 }
+.dim:hover .dim-thumb, .dim.editing .dim-thumb { opacity: 1; scale: 1; }
+.dim.editing .dim-thumb { background: var(--blueprint); }
+/* 尺寸界线端头：建筑制图惯用的 45° 斜切标记 */
+.dim-tick {
+  width: 1px; height: 10px; flex-shrink: 0;
+  background: var(--hair-strong);
+  transform: rotate(45deg);
+}
+/* 刻度尺：每 10% 一根分度线，让进度条读起来像一把比例尺 */
+.dim-line::after {
+  content: ''; position: absolute; left: 1px; right: 1px;
+  top: calc(50% + 4px); height: 3px; pointer-events: none;
+  background: repeating-linear-gradient(90deg,
+    var(--hair-strong) 0 1px, transparent 1px 11.1111%);
+  opacity: .55;
+  transition: opacity .16s var(--ease);
+}
+.dim:hover .dim-line::after { opacity: .9; }
+.dim-val {
+  font-family: var(--f-mono); font-size: 10.5px; font-weight: 500;
+  color: var(--ink-2); min-width: 34px; text-align: right;
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+.dim-val i { font-style: normal; opacity: .5; font-size: 9px; margin-left: 1px; }
+.dim[data-level="low"]  .dim-fill { background: var(--rust); }
+.dim[data-level="mid"]  .dim-fill { background: var(--blueprint); }
+.dim[data-level="high"] .dim-fill { background: var(--sage); }
+.dim[data-level="none"] .dim-fill { background: transparent; }
+.dim[data-level="low"]  .dim-thumb { border-color: var(--rust); }
+.dim[data-level="mid"]  .dim-thumb { border-color: var(--blueprint); }
+.dim[data-level="high"] .dim-thumb { border-color: var(--sage); }
+.dim[data-level="none"] .dim-thumb { border-color: var(--ink-4); }
+.dim[data-level="low"]  .dim-val { color: var(--rust); }
+.dim[data-level="high"] .dim-val { color: var(--sage); }
 
-/* Status badge */
+/* Status — 制图校验标记 */
 .status-badge {
-  display: inline-block; padding: 1px 7px; border-radius: 3px;
-  font-size: 11px; font-weight: 500; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: .06em;
+  flex-shrink: 0; padding: 1px 0; cursor: pointer;
+  color: var(--ink-3);
+  border-bottom: 1px solid transparent;
+  transition: border-color .16s var(--ease), color .16s var(--ease);
 }
-.status-notstarted { background: var(--status-not-bg);  color: var(--status-not-text);  }
-.status-inprogress { background: var(--status-prog-bg); color: var(--status-prog-text); }
-.status-completed  { background: var(--status-done-bg); color: var(--status-done-text); }
+.status-badge:hover { border-bottom-color: currentColor; }
+.status-badge::before {
+  content: ''; width: 8px; height: 8px; flex-shrink: 0;
+  border: 1px solid currentColor;
+}
+.status-badge[data-status="进行中"] { color: var(--blueprint); }
+.status-badge[data-status="进行中"]::before {
+  background: linear-gradient(to top, var(--blueprint) 50%, transparent 50%);
+}
+.status-badge[data-status="已完成"] { color: var(--sage); }
+.status-badge[data-status="已完成"]::before {
+  background: var(--sage);
+  box-shadow: inset 0 0 0 1px var(--sage);
+}
 
-/* Dates & notes */
-.task-card .date-range { font-size: 11px; color: #999; }
-.task-card .notes { font-size: 11px; color: #777; }
-.task-card .notes .placeholder { color: #ddd; }
+/* Dates — 时间标注 */
+.task-card .task-dates {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: .04em;
+  color: var(--ink-3); font-variant-numeric: tabular-nums;
+}
+.task-card .task-dates em { font-style: normal; color: var(--ink-4); }
+.task-card .task-dates .editable { cursor: pointer; transition: color .16s var(--ease); }
+.task-card .task-dates .editable:hover { color: var(--blueprint); }
+.task-card .date-range .placeholder { color: var(--ink-3); letter-spacing: .08em; }
+
+/* Notes */
+.task-card .notes {
+  font-size: 11.5px; line-height: 1.5; color: var(--ink-3);
+  flex: 1; min-width: 0;
+  border-top: 1px dotted var(--hair); padding-top: 5px;
+}
+.task-card .notes .placeholder { color: var(--ink-3); font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; }
 
 /* Delete button */
 .card-del {
-  position: absolute; top: 4px; right: 6px;
-  width: 18px; height: 18px; line-height: 18px; text-align: center;
-  border-radius: 50%; border: none; background: transparent;
-  color: #ccc; font-size: 14px; cursor: pointer;
-  opacity: 0; transition: opacity 0.15s;
+  width: 16px; height: 16px; line-height: 14px; text-align: center;
+  flex-shrink: 0;
+  border: 1px solid transparent; background: transparent;
+  color: var(--ink-3); font-size: 13px; cursor: pointer;
+  opacity: 0; transition: opacity .16s var(--ease), color .16s var(--ease), border-color .16s var(--ease);
 }
 .task-card:hover .card-del { opacity: 1; }
-.card-del:hover { background: #fee; color: #e00; }
+.card-del:hover { color: var(--rust); border-color: var(--rust); }
+@media (hover: none) { .card-del { opacity: .55; } }
 
 /* ===== Inline Edit ===== */
 .editable { cursor: pointer; }
 .task-card input, .task-card select {
-  font-family: inherit; font-size: inherit;
-  border: 1px solid #2196F3; border-radius: 3px;
+  font-family: var(--f-mono); font-size: 12px;
+  border: 1px solid var(--blueprint); border-radius: 0;
   outline: none; padding: 1px 4px;
+  background: var(--paper-raised); color: var(--ink);
 }
-.task-card input[type="text"] { width: 100%; }
+.task-card input:focus, .task-card select:focus { box-shadow: 0 0 0 2px var(--blueprint-soft); }
+.task-card .task-name input[type="text"] { font-family: var(--f-body); width: 100%; font-size: 13px; }
 .task-card input[type="number"] { width: 56px; text-align: center; }
-.task-card input[type="date"] { width: 110px; }
+.task-card input[type="date"] { width: 112px; }
 .task-card select { cursor: pointer; }
 
 /* ===== Scrollbar ===== */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #b0b0b0; }
+::-webkit-scrollbar-thumb { background: var(--hair-strong); }
+::-webkit-scrollbar-thumb:hover { background: var(--blueprint); }
 
 /* ===== Sync Indicator ===== */
 #sync-status {
-  display: none; align-items: center; gap: 4px;
-  font-size: 12px; color: #999;
+  display: none; align-items: center; gap: 6px;
+  font-family: var(--f-mono); font-size: 10px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--ink-3);
 }
 #sync-status.configured { display: flex; }
 #sync-status .sync-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #ccc;
+  width: 6px; height: 6px; border-radius: 0; transform: rotate(45deg);
+  background: var(--ink-4); flex-shrink: 0;
 }
-#sync-status.synced .sync-dot { background: #10b981; }
-#sync-status.syncing .sync-dot { background: #f59e0b; animation: pulse 0.8s infinite; }
-#sync-status.error .sync-dot { background: #ef4444; }
-@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+#sync-status.synced .sync-dot { background: var(--sage); }
+#sync-status.syncing .sync-dot { background: var(--amber); animation: pulse .9s infinite; }
+#sync-status.error .sync-dot { background: var(--rust); }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.25; } }
 
-#btn-settings {
-  font-size: 14px; padding: 4px 8px; border: 1px solid transparent;
-  background: transparent; cursor: pointer; border-radius: 4px;
-}
-#btn-settings:hover { background: #f0f0f0; border-color: #ddd; }
+#toolbar .tools { display: flex; align-items: center; gap: 6px; }
+#btn-settings { font-size: 12px; padding: 4px 8px; border-color: transparent; }
+#btn-settings:hover { border-color: var(--blueprint); }
 
 /* ===== Settings Dialog ===== */
 #settings-overlay {
   display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,0.4); z-index: 10000;
+  background: rgba(20, 24, 26, .48);
+  backdrop-filter: blur(3px);
+  z-index: 10000;
   align-items: center; justify-content: center;
 }
 #settings-overlay.show { display: flex; }
 #settings-dialog {
-  background: #fff; border-radius: 10px; padding: 24px;
-  width: 420px; max-width: 90vw;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  background: var(--paper-raised);
+  border: 1px solid var(--hair-strong);
+  box-shadow: 0 0 0 5px var(--paper-raised), var(--shadow-2);
+  padding: 26px 26px 22px;
+  width: 430px; max-width: 90vw;
 }
-#settings-dialog h3 { margin-bottom: 16px; font-size: 16px; }
+#settings-dialog h3 {
+  font-family: var(--f-display); font-size: 17px; font-weight: 600;
+  margin-bottom: 4px; letter-spacing: .01em;
+}
+#settings-dialog .sub {
+  font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: 18px;
+  padding-bottom: 12px; border-bottom: 1px solid var(--hair);
+}
 #settings-dialog label {
-  display: block; font-size: 12px; font-weight: 600;
-  color: #666; margin-bottom: 4px; margin-top: 12px;
+  display: block; font-family: var(--f-mono); font-size: 9.5px; font-weight: 500;
+  letter-spacing: .13em; text-transform: uppercase;
+  color: var(--ink-3); margin-bottom: 5px; margin-top: 15px;
 }
 #settings-dialog label:first-of-type { margin-top: 0; }
 #settings-dialog input {
-  width: 100%; padding: 7px 10px; border: 1px solid #d0d0d0;
-  border-radius: 4px; font-family: inherit; font-size: 13px;
+  width: 100%; padding: 8px 10px; border: 1px solid var(--hair-strong);
+  border-radius: 0; font-family: var(--f-mono); font-size: 12.5px;
+  background: var(--paper); color: var(--ink);
 }
-#settings-dialog input:focus { outline: none; border-color: #1a73e8; }
+#settings-dialog input:focus { outline: none; border-color: var(--blueprint); box-shadow: 0 0 0 2px var(--blueprint-soft); }
 #settings-dialog .hint {
-  font-size: 11px; color: #999; margin-top: 2px;
+  font-size: 11px; color: var(--ink-3); margin-top: 5px; line-height: 1.5;
 }
-#settings-dialog .hint a { color: #1a73e8; }
+#settings-dialog .hint a { color: var(--blueprint); }
 #settings-dialog .btn-row {
   display: flex; gap: 8px; justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--hair);
 }
 #settings-dialog button {
-  font-family: inherit; font-size: 12px;
-  padding: 6px 16px; border-radius: 4px; cursor: pointer;
-  border: 1px solid #d0d0d0; background: #fff;
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .05em;
+  padding: 7px 15px; border-radius: 0; cursor: pointer;
+  border: 1px solid var(--hair-strong); background: transparent; color: var(--ink-2);
+  transition: all .16s var(--ease);
 }
-#settings-dialog button.primary {
-  background: #1a73e8; color: #fff; border-color: #1a73e8;
-}
-#settings-dialog button.primary:hover { background: #1557b0; }
-#settings-dialog button.danger { color: #e00; border-color: transparent; background: transparent; }
-#settings-dialog button.danger:hover { background: #fee; }
+#settings-dialog button:hover { border-color: var(--blueprint); color: var(--blueprint); background: var(--blueprint-soft); }
+#settings-dialog button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+#settings-dialog button.primary:hover { background: var(--blueprint); border-color: var(--blueprint); color: var(--paper-raised); }
+#settings-dialog button.danger { color: var(--rust); border-color: transparent; background: transparent; margin-right: auto; }
+#settings-dialog button.danger:hover { background: var(--rust); color: var(--paper-raised); border-color: var(--rust); }
 
-/* ===== Save Bar ===== */
+/* ===== Save stamp ===== */
 #save-bar {
-  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-  padding: 10px 0 14px; z-index: 200;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  display: flex; justify-content: center;
+  padding: 12px 0 14px; z-index: 200;
   pointer-events: none;
+  background: linear-gradient(to top, var(--paper) 30%, transparent);
 }
 #btn-save {
   pointer-events: auto;
-  font-family: inherit; font-size: 14px; font-weight: 600;
-  padding: 10px 32px; border-radius: 24px;
-  border: none; cursor: pointer;
-  display: flex; align-items: center; gap: 8px;
-  transition: all 0.25s;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  font-family: var(--f-mono); font-size: 11px; font-weight: 500; letter-spacing: .11em;
+  text-transform: uppercase;
+  padding: 9px 20px;
+  border-radius: 0; cursor: pointer;
+  display: flex; align-items: center; gap: 9px;
+  background: var(--paper-raised); color: var(--ink-2);
+  border: 1px solid var(--hair-strong);
+  box-shadow: var(--shadow-1);
+  transition: all .2s var(--ease);
 }
-#btn-save .save-icon { font-size: 16px; }
-#btn-save.saved {
-  background: #e8f5e9; color: #4caf50;
-}
-#btn-save.saving {
-  background: #fff3e0; color: #f59e0b;
-}
+#btn-save:hover { border-color: var(--blueprint); color: var(--blueprint); }
+#btn-save .save-icon { font-size: 12px; line-height: 1; }
+#btn-save.saved { color: var(--sage); border-color: var(--sage); }
+#btn-save.saving { color: var(--amber); border-color: var(--amber); }
 #btn-save.unsaved {
-  background: #1a73e8; color: #fff;
-  animation: save-pulse 1.5s infinite;
+  background: var(--ink); color: var(--paper); border-color: var(--ink);
+  animation: stamp-glow 2s var(--ease) infinite;
 }
-#btn-save.error {
-  background: #fce4ec; color: #e53935;
-}
-@keyframes save-pulse {
-  0%, 100% { box-shadow: 0 4px 20px rgba(26,115,232,0.3); }
-  50% { box-shadow: 0 4px 32px rgba(26,115,232,0.6); }
+#btn-save.unsaved:hover { background: var(--blueprint); border-color: var(--blueprint); color: var(--paper-raised); }
+#btn-save.error { color: var(--rust); border-color: var(--rust); background: var(--paper-raised); }
+@keyframes stamp-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(28,26,22,.28); }
+  55%      { box-shadow: 0 0 0 7px rgba(28,26,22,0); }
 }
 
 /* ===== Search & Filter ===== */
 .search-input {
-  font-family: inherit; font-size: 12px;
-  padding: 5px 10px; width: 140px;
-  border: 1px solid #d0d0d0; border-radius: 4px;
-  background: #fff; outline: none; color: #444;
-  transition: border-color 0.15s;
+  font-family: var(--f-mono); font-size: 11.5px;
+  padding: 5px 2px; width: 152px;
+  border: none; border-bottom: 1px solid var(--hair-strong);
+  background: transparent; outline: none; color: var(--ink);
+  border-radius: 0;
+  transition: border-color .16s var(--ease);
 }
-.search-input:focus { border-color: #1a73e8; }
-.search-input::placeholder { color: #bbb; }
+.search-input:focus { border-bottom-color: var(--blueprint); }
+.search-input::placeholder { color: var(--ink-3); letter-spacing: .05em; }
 
 .status-filters { display: flex; gap: 4px; }
-.filter-btn {
-  font-family: inherit; font-size: 11px;
-  padding: 3px 10px; border-radius: 10px;
-  border: 1px solid #d0d0d0; background: #fff;
-  color: #666; cursor: pointer; white-space: nowrap;
-  transition: all 0.15s;
+/* 注意：#toolbar button 的 ID 特异性更高，这里必须同级作用域才能生效 */
+#toolbar .filter-btn {
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .07em;
+  padding: 4px 10px; color: var(--ink-3);
 }
-.filter-btn:hover { background: #f0f0f0; border-color: #bbb; }
-.filter-btn.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+#toolbar .filter-btn:hover { color: var(--blueprint); border-color: var(--blueprint); background: var(--blueprint-soft); }
+#toolbar .filter-btn.active {
+  background: var(--ink); border-color: var(--ink);
+  color: var(--paper-raised); font-weight: 500;
+}
+#toolbar .filter-btn.active:hover { background: var(--blueprint); border-color: var(--blueprint); color: var(--paper-raised); }
 
-/* ===== Stats Bar ===== */
+/* ===== Stats — 图签栏 ===== */
 #stats-bar {
-  display: flex; gap: 12px; padding: 8px 16px;
-  background: #fff; border-bottom: 1px solid #e8e8e8;
-  flex-wrap: wrap; align-items: center;
-  font-size: 12px; color: #666;
+  display: flex; align-items: stretch; flex-wrap: wrap;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--hair-strong);
+  font-size: 12px; color: var(--ink-2);
 }
-.stat-item {
-  display: flex; align-items: center; gap: 4px;
-  background: #f8f9fa; padding: 4px 10px; border-radius: 6px;
+.stat-cell {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 9px 18px;
+  border-right: 1px solid var(--hair);
+  min-width: 84px;
 }
-.stat-item .stat-value { font-weight: 700; color: #333; }
-.stat-item .stat-label { color: #999; }
-.stat-divider { width: 1px; height: 16px; background: #e0e0e0; }
+.stat-cell.wide { min-width: 150px; flex: 0 0 auto; }
+.stat-cell .anno { font-size: 8.5px; letter-spacing: .15em; }
+.stat-value {
+  font-family: var(--f-mono); font-size: 18px; font-weight: 500; line-height: 1;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.stat-value em { font-style: normal; font-size: 10px; color: var(--ink-3); margin-left: 1px; }
+.stat-value.is-good { color: var(--sage); }
+.stat-value.is-warn { color: var(--amber); }
+.stat-value.is-bad  { color: var(--rust); }
+.rate-track { position: relative; height: 2px; width: 100%; background: var(--paper-sunk); box-shadow: inset 0 0 0 1px var(--hair); margin-top: 3px; }
+.rate-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--blueprint); transition: width .45s var(--ease); }
+.rate-track.is-good i { background: var(--sage); }
+.rate-track.is-warn i { background: var(--amber); }
+.rate-track.is-bad  i { background: var(--rust); }
+
 .stat-person {
-  display: flex; align-items: center; gap: 4px;
-  padding: 3px 8px; border-radius: 6px; background: #f8f9fa;
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 9px 16px;
+  border-right: 1px solid var(--hair);
+  flex: 1 1 96px; max-width: 172px; min-width: 96px;
 }
-.stat-person .stat-dot { width: 6px; height: 6px; border-radius: 50%; }
-.stat-person .stat-done { color: #059669; font-weight: 600; }
-.stat-person .stat-total { color: #999; }
+.sp-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.stat-person .stat-dot { width: 6px; height: 6px; flex-shrink: 0; transform: rotate(45deg); }
+.stat-person .sp-name { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-person .sp-num {
+  margin-left: auto; font-family: var(--f-mono); font-size: 10.5px;
+  font-variant-numeric: tabular-nums; color: var(--ink-3); flex-shrink: 0;
+}
+.stat-person .sp-num b { color: var(--sage); font-weight: 500; }
+.sp-bar { position: relative; height: 2px; background: var(--paper-sunk); box-shadow: inset 0 0 0 1px var(--hair); }
+.sp-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--blueprint); transition: width .45s var(--ease); }
+
+.stat-legend {
+  display: flex; align-items: center; gap: 14px;
+  padding: 9px 18px; margin-left: auto;
+  font-family: var(--f-mono); font-size: 9px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-3);
+  border-left: 1px solid var(--hair);
+}
+.stat-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.stat-legend span::before { content: ''; width: 7px; height: 7px; border: 1px solid currentColor; }
+.stat-legend .lg-not { color: var(--ink-3); }
+.stat-legend .lg-prog { color: var(--blueprint); }
+.stat-legend .lg-prog::before { background: linear-gradient(to top, currentColor 50%, transparent 50%); }
+.stat-legend .lg-done { color: var(--sage); }
+.stat-legend .lg-done::before { background: currentColor; }
 
 /* ===== Responsive ===== */
-@media (max-width: 1000px) { #board { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px)  { #board { grid-template-columns: 1fr; } }
+@media (max-width: 1120px) { #board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  #board { grid-template-columns: minmax(0, 1fr); padding: 14px 14px 92px; gap: 14px; }
+  #toolbar { padding: 9px 12px; gap: 10px; }
+  #brand { padding-right: 10px; }
+  #brand .name { display: none; }
+  #week-label { font-size: 17px; }
+  .search-input { width: 100%; }
+  #stats-bar { overflow-x: auto; }
+  .stat-legend { display: none; }
+  .stat-person { flex: 0 0 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
 </style>
 </head>
 <body>
 
 <div id="toolbar">
-  <button type="button" class="week-nav" id="btn-prev-week" title="上一周">◀</button>
-  <span class="week-label" id="week-label"></span>
-  <button type="button" class="week-nav" id="btn-next-week" title="下一周">▶</button>
-  <button type="button" id="btn-today">今天</button>
+  <div id="brand">
+    <span class="mark">WTP</span>
+    <span class="name">效果图部门 · 周任务进度表</span>
+  </div>
+  <div class="week-group">
+    <button type="button" class="week-nav" id="btn-prev-week" title="上一周">◀</button>
+    <span id="week-label"></span>
+    <button type="button" class="week-nav" id="btn-next-week" title="下一周">▶</button>
+  </div>
+  <button type="button" id="btn-today">回到本周</button>
+  <button type="button" id="btn-copy-prev">复制上周未完成</button>
   <span class="sep"></span>
-  <button type="button" id="btn-copy-prev">从上周复制未完成任务</button>
-  <span class="sep"></span>
-  <input type="text" id="search-input" class="search-input" placeholder="搜索任务..." />
+  <input type="text" id="search-input" class="search-input" placeholder="搜索任务 / FIND" />
   <div id="status-filters" class="status-filters">
     <button type="button" class="filter-btn active" data-filter="all">全部</button>
     <button type="button" class="filter-btn" data-filter="未开始">未开始</button>
@@ -416,6 +706,7 @@ body {
   </div>
   <span class="sep"></span>
   <span id="sync-status"><span class="sync-dot"></span><span id="sync-text">未配置同步</span></span>
+  <button type="button" id="btn-theme" title="切换图纸/蓝图配色">◐</button>
   <button type="button" id="btn-settings" title="同步设置">⚙</button>
 </div>
 
@@ -426,13 +717,14 @@ body {
 <div id="save-bar">
   <button type="button" id="btn-save" class="saved">
     <span class="save-icon">✓</span>
-    <span class="save-text">已保存</span>
+    <span class="save-text">已同步</span>
   </button>
 </div>
 
 <div id="settings-overlay">
   <div id="settings-dialog">
-    <h3>⚙ 同步设置</h3>
+    <h3>同步设置</h3>
+    <p class="sub">Cloud Sync · GitHub Gist</p>
     <label>Gist ID</label>
     <input type="text" id="cfg-gist-id" value="1c847a7d6d0e61fb090eb581d5e988b7" placeholder="从 Gist URL 中复制，如 a1b2c3d4e5f6...">
     <p class="hint">创建一个 <a href="https://gist.github.com/" target="_blank" rel="noopener">GitHub Gist</a>，在 URL 末尾获取 ID</p>
@@ -453,14 +745,20 @@ body {
 // ======================================================================
 const C = {
   STORAGE_KEY: 'renderDeptWeeklyTracker',
+  THEME_KEY: 'renderTrackerTheme',
   SCHEMA_VERSION: 2,
   MEMBERS: ['易榆乔', '杨威', '易灿', '刘新金'],
   DOT_CLASSES: ['dot-c0','dot-c1','dot-c2','dot-c3'],
   PRIORITIES: ['高', '中', '低'],
   STATUSES: ['未开始', '进行中', '已完成'],
   PRIO_CLASSES: { '高': 'prio-high', '中': 'prio-med', '低': 'prio-low' },
-  STATUS_CLASSES: { '未开始': 'status-notstarted', '进行中': 'status-inprogress', '已完成': 'status-completed' },
+  PRIO_CODES: { '高': 'P1', '中': 'P2', '低': 'P3' },
 };
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 // ======================================================================
 // FilterState — Search & status filter
@@ -558,22 +856,24 @@ const GistSync = {
 
   // Merge remote into local: tasks from either side kept, deduped by id.
   // Remote wins on conflict (same id, newer updatedAt).
+  // 远端没有新内容时原样返回 localState，便于调用方按引用判断是否有变化。
   merge(localState, remoteState) {
-    if (!remoteState || !remoteState.tasks) return localState;
+    if (!remoteState || !Array.isArray(remoteState.tasks)) return localState;
     const taskMap = new Map();
-    // Local first
     (localState.tasks || []).forEach(t => taskMap.set(t.id, t));
-    // Remote overrides if newer
-    (remoteState.tasks || []).forEach(t => {
+    let changed = false;
+    remoteState.tasks.forEach(t => {
       const existing = taskMap.get(t.id);
-      if (!existing || (t.updatedAt > existing.updatedAt)) {
-        taskMap.set(t.id, t);
+      if (existing) {
+        if (t.updatedAt > existing.updatedAt) { taskMap.set(t.id, t); changed = true; }
+      } else {
+        taskMap.set(t.id, t); changed = true;
       }
     });
+    if (!changed) return localState;
     return {
       ...localState,
       tasks: Array.from(taskMap.values()),
-      // Keep the newer currentWeek
       currentWeek: localState.currentWeek || remoteState.currentWeek,
     };
   },
@@ -613,30 +913,16 @@ const GistSync = {
 // SaveBtn — Floating save button at bottom center
 // ======================================================================
 const SaveBtn = {
-  setSaved() {
+  _set(cls, icon, text) {
     const btn = document.getElementById('btn-save');
-    btn.className = 'saved';
-    btn.querySelector('.save-icon').textContent = '✓';
-    btn.querySelector('.save-text').textContent = '已保存';
+    btn.className = cls;
+    btn.querySelector('.save-icon').textContent = icon;
+    btn.querySelector('.save-text').textContent = text;
   },
-  setUnsaved() {
-    const btn = document.getElementById('btn-save');
-    btn.className = 'unsaved';
-    btn.querySelector('.save-icon').textContent = '↑';
-    btn.querySelector('.save-text').textContent = '点击保存到云端';
-  },
-  setSaving() {
-    const btn = document.getElementById('btn-save');
-    btn.className = 'saving';
-    btn.querySelector('.save-icon').textContent = '⏳';
-    btn.querySelector('.save-text').textContent = '保存中...';
-  },
-  setError() {
-    const btn = document.getElementById('btn-save');
-    btn.className = 'error';
-    btn.querySelector('.save-icon').textContent = '↻';
-    btn.querySelector('.save-text').textContent = '同步失败 — 点击重试';
-  },
+  setSaved()   { this._set('saved',   '✓', '已同步'); },
+  setUnsaved() { this._set('unsaved', '↑', '点击上传到云端'); },
+  setSaving()  { this._set('saving',  '◎', '上传中…'); },
+  setError()   { this._set('error',   '↻', '同步失败 · 点击重试'); },
 };
 
 // ======================================================================
@@ -691,7 +977,9 @@ const Toast = {
     el.appendChild(span);
     const btn = document.createElement('button');
     btn.textContent = '撤销';
-    btn.style.cssText = 'background:#fff;color:#1a73e8;border:1px solid #1a73e8;border-radius:4px;padding:2px 10px;margin-left:10px;cursor:pointer;font-size:12px;font-weight:600;';
+    btn.style.cssText = 'background:transparent;color:var(--paper);border:1px solid var(--paper);border-radius:0;padding:2px 9px;margin-left:12px;cursor:pointer;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;opacity:.85;';
+    btn.addEventListener('mouseenter', () => { btn.style.opacity = '1'; });
+    btn.addEventListener('mouseleave', () => { btn.style.opacity = '.85'; });
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       clearTimeout(this._timer);
@@ -746,16 +1034,13 @@ const WeekUtils = {
     sunday.setDate(monday.getDate() + 6);
     return { start: monday, end: sunday };
   },
-  formatDateRange(weekStr) {
+  // 制图标注写法：09.15 — 09.21
+  formatDimRange(weekStr) {
     const r = this.getWeekDateRange(weekStr);
-    const fmt = d => (d.getMonth() + 1) + '月' + d.getDate() + '日';
-    return fmt(r.start) + ' — ' + fmt(r.end);
-  },
-  formatShortDate(isoStr) {
-    if (!isoStr) return '';
-    const d = new Date(isoStr + 'T00:00:00');
-    if (isNaN(d.getTime())) return isoStr;
-    return (d.getMonth() + 1) + '/' + d.getDate();
+    const p = n => String(n).padStart(2, '0');
+    const a = p(r.start.getMonth() + 1) + '.' + p(r.start.getDate());
+    const b = p(r.end.getMonth() + 1) + '.' + p(r.end.getDate());
+    return a + ' — ' + b;
   },
   addWeeks(weekStr, delta) {
     const monday = this.weekStrToMonday(weekStr);
@@ -787,9 +1072,9 @@ const Storage = {
     }
   },
 
-  // Async load: local first, then try remote merge
-  async loadAsync() {
-    const local = this.load();
+  // Async load: local first, then try remote merge.
+  // 返回同一个引用表示远端没有带来变化。
+  async loadAsync(local) {
     if (!GistSync.isConfigured()) {
       SyncStatus.notConfigured();
       return local;
@@ -929,21 +1214,26 @@ const DataModel = {
 
   copyIncompleteFromPrev(weekStr) {
     const prevTasks = this.getPrevWeekTasks(weekStr);
-    const incomplete = prevTasks.filter(t => t.status !== '已完成' && t.progress < 100);
-    if (incomplete.length === 0) return 0;
+    const pending = prevTasks.filter(t => t.status !== '已完成' && t.progress < 100);
+    // 同名同人视为已复制过，避免连点两下就翻倍
+    const existing = new Set(this.getTasks(weekStr).map(t => t.person + '\u241f' + t.name));
+    const incomplete = pending.filter(t => !existing.has(t.person + '\u241f' + t.name));
+    const skipped = pending.length - incomplete.length;
 
-    incomplete.forEach(t => {
+    const stamp = Date.now();
+    const copies = incomplete.map((t, i) => {
       const copy = JSON.parse(JSON.stringify(t));
-      copy.id = 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+      copy.id = `t_${stamp}_${i}_${Math.random().toString(36).slice(2, 8)}`;
       copy.week = weekStr;
       copy.progress = 0;
       copy.status = '未开始';
       copy.createdAt = new Date().toISOString();
       copy.updatedAt = new Date().toISOString();
       this.state.tasks.push(copy);
+      return copy;
     });
-    this._save();
-    return incomplete.length;
+    if (copies.length > 0) this._save();
+    return { copies, skipped };
   },
 
   _save() { Storage.save(this.state); GistSync.pushDebounced(this.state); },
@@ -960,28 +1250,35 @@ const Renderer = {
   },
 
   renderToolbar(weekStr) {
+    const p = WeekUtils.parseWeekStr(weekStr);
+    const label = p ? `${p.year}年第${p.week}周` : esc(weekStr);
+    const flag = WeekUtils.isCurrentWeek(weekStr) ? '<em class="wk-flag">本周</em>' : '';
     document.getElementById('week-label').innerHTML =
-      `${weekStr.replace('-W', '年第')}周 <span class="date-range">(${WeekUtils.formatDateRange(weekStr)})</span>`;
+      `<span class="wk-main">${label}${flag}</span><span class="date-range">${WeekUtils.formatDimRange(weekStr)}</span>`;
   },
 
   renderStats(weekStr) {
-    const allTasks = DataModel.getTasks(weekStr);
-    const filtered = FilterState.apply(allTasks);
+    const filtered = FilterState.apply(DataModel.getTasks(weekStr));
     const total = filtered.length;
     const done = filtered.filter(t => t.status === '已完成').length;
     const rate = total > 0 ? Math.round(done / total * 100) : 0;
+    const lvl = rate >= 80 ? 'is-good' : rate >= 50 ? 'is-warn' : 'is-bad';
 
-    let html = `<div class="stat-item"><span class="stat-value">${total}</span><span class="stat-label">任务</span></div>`;
-    html += `<div class="stat-item"><span class="stat-value" style="color:${rate >= 80 ? '#059669' : rate >= 50 ? '#d97706' : '#dc2626'}">${rate}%</span><span class="stat-label">完成率</span></div>`;
-    html += `<div class="stat-item"><span class="stat-value">${done}/${total}</span><span class="stat-label">已完成</span></div>`;
-    html += `<div class="stat-divider"></div>`;
+    let html = `<div class="stat-cell"><span class="anno">任务总数</span><span class="stat-value">${total}</span></div>`;
+    html += `<div class="stat-cell"><span class="anno">已完成</span><span class="stat-value">${done}<em>/${total}</em></span></div>`;
+    html += `<div class="stat-cell wide"><span class="anno">完成率</span><span class="stat-value ${lvl}">${rate}<em>%</em></span><span class="rate-track ${lvl}"><i style="width:${rate}%"></i></span></div>`;
 
     C.MEMBERS.forEach((person, i) => {
       const tasks = FilterState.apply(DataModel.getTasksByPerson(weekStr, person));
       const personDone = tasks.filter(t => t.status === '已完成').length;
-      html += `<div class="stat-person"><span class="stat-dot ${C.DOT_CLASSES[i]}"></span><span>${person}</span><span class="stat-done">${personDone}</span><span class="stat-total">/${tasks.length}</span></div>`;
+      const personRate = tasks.length > 0 ? Math.round(personDone / tasks.length * 100) : 0;
+      html += `<div class="stat-person">
+        <div class="sp-top"><span class="stat-dot ${C.DOT_CLASSES[i]}"></span><span class="sp-name">${esc(person)}</span><span class="sp-num"><b>${personDone}</b>/${tasks.length}</span></div>
+        <div class="sp-bar"><i style="width:${personRate}%"></i></div>
+      </div>`;
     });
 
+    html += `<div class="stat-legend"><span class="lg-not">未开始</span><span class="lg-prog">进行中</span><span class="lg-done">已完成</span></div>`;
     document.getElementById('stats-bar').innerHTML = html;
   },
 
@@ -989,68 +1286,65 @@ const Renderer = {
     const board = document.getElementById('board');
     let html = '';
     C.MEMBERS.forEach(person => {
-      const allTasks = DataModel.getTasksByPerson(weekStr, person);
-      const tasks = FilterState.apply(allTasks);
+      const tasks = FilterState.apply(DataModel.getTasksByPerson(weekStr, person));
       html += this._renderColumn(person, tasks);
     });
     board.innerHTML = html;
-
-    // Bind events
-    C.MEMBERS.forEach((person, i) => {
-      const colBody = document.getElementById(`col-body-${i}`);
-      if (colBody) {
-        colBody.querySelectorAll('.task-card').forEach(card => {
-          this._bindCardEvents(card);
-        });
-      }
-    });
   },
 
   _renderColumn(person, tasks) {
     const idx = C.MEMBERS.indexOf(person);
-    const dotCls = C.DOT_CLASSES[idx];
-    const empty = tasks.length === 0 ? ' empty' : '';
+    const done = tasks.filter(t => t.status === '已完成').length;
+    const rate = tasks.length > 0 ? Math.round(done / tasks.length * 100) : 0;
 
-    let html = `<div class="column">`;
-    html += `<div class="column-header">`;
-    html += `<span class="person-name"><span class="dot ${dotCls}"></span>${person}</span>`;
-    html += `<span class="task-count">${tasks.length} 项</span>`;
+    let html = `<div class="column" id="column-${idx}">`;
+    html += `<div class="column-header">
+      <div class="ph-left">
+        <span class="sht">SHT ${String(idx + 1).padStart(2, '0')}</span>
+        <span class="person-name"><span class="dot ${C.DOT_CLASSES[idx]}"></span>${esc(person)}</span>
+      </div>
+      <div class="ph-right">
+        <span class="task-count">${tasks.length}<i>项</i></span>
+        <span class="ph-sub">完成 <b>${done}</b> · ${rate}%</span>
+      </div>
+    </div>`;
+
+    html += `<div class="column-body${tasks.length === 0 ? ' empty' : ''}" id="col-body-${idx}">`;
+    tasks.forEach((task, n) => { html += this._renderCard(task, n); });
     html += `</div>`;
 
-    html += `<div class="column-body${empty}" id="col-body-${idx}">`;
-    tasks.forEach(task => {
-      html += this._renderCard(task);
-    });
-    html += `</div>`;
-
-    html += `<div class="column-footer">`;
-    html += `<button class="btn-add-person" data-person="${person}">+ 添加任务</button>`;
-    html += `</div>`;
+    html += `<div class="column-footer">
+      <button class="btn-add-person" data-person="${esc(person)}">+ 添加任务</button>
+    </div>`;
     html += `</div>`;
     return html;
   },
 
-  _renderCard(task) {
+  _renderCard(task, order) {
     const pcls = C.PRIO_CLASSES[task.priority] || '';
-    const scls = C.STATUS_CLASSES[task.status] || '';
-    const name = task.name || '<span class="placeholder">点击输入任务名</span>';
-    const notes = task.notes || '<span class="placeholder">备注</span>';
+    const name = task.name ? esc(task.name) : '<span class="placeholder">点击输入任务名称</span>';
+    const notes = task.notes ? esc(task.notes) : '<span class="placeholder">备注 / NOTES</span>';
 
     return `
-    <div class="task-card" data-task-id="${task.id}">
-      <button class="card-del" data-task-id="${task.id}" title="删除">×</button>
+    <div class="task-card" data-task-id="${esc(task.id)}" data-status="${esc(task.status)}" style="animation-delay:${Math.min(order, 12) * 26}ms">
+      <div class="card-row">
+        <span class="prio-badge ${pcls} editable" data-field="priority" data-code="${C.PRIO_CODES[task.priority] || ''}" title="优先级">${esc(task.priority)}</span>
+        <span class="spacer"></span>
+        <span class="status-badge editable" data-field="status" data-status="${esc(task.status)}">${esc(task.status)}</span>
+        <button class="card-del" data-task-id="${esc(task.id)}" title="删除">×</button>
+      </div>
       <div class="card-row">
         <span class="task-name editable" data-field="name">${name}</span>
-        <span class="prio-badge ${pcls} editable" data-field="priority">${task.priority}</span>
       </div>
       <div class="card-row">
         ${this._renderProgressBar(task.progress)}
-        <span class="status-badge ${scls} editable" data-field="status">${task.status}</span>
       </div>
       <div class="card-row">
-        <span class="date-range editable" data-field="startDate" title="开始日期">${this._formatSingleDate(task.startDate, '开始')}</span>
-        <span style="color:#ccc;font-size:11px">—</span>
-        <span class="date-range editable" data-field="dueDate" title="结束日期">${this._formatSingleDate(task.dueDate, '结束')}</span>
+        <span class="task-dates">
+          <span class="date-range editable" data-field="startDate" title="开始日期">${this._formatSingleDate(task.startDate)}</span>
+          <em>—</em>
+          <span class="date-range editable" data-field="dueDate" title="结束日期">${this._formatSingleDate(task.dueDate)}</span>
+        </span>
       </div>
       <div class="card-row">
         <span class="notes editable" data-field="notes">${notes}</span>
@@ -1058,53 +1352,31 @@ const Renderer = {
     </div>`;
   },
 
-  _renderProgressBar(pct) {
-    let color = 'var(--progress-mid)';
-    if (pct >= 70) color = 'var(--progress-high)';
-    else if (pct <= 30 && pct > 0) color = 'var(--progress-low)';
-    else if (pct === 0) color = 'transparent';
+  _progressLevel(pct) {
+    if (pct <= 0) return 'none';
+    if (pct <= 30) return 'low';
+    if (pct >= 70) return 'high';
+    return 'mid';
+  },
 
-    return `<div class="prog-outer editable" data-field="progress" title="进度 ${pct}%">
-      <div class="prog-inner" style="width:${pct}%;background:${color};${pct===0?'min-width:0':''}"></div>
-      <span class="prog-label">${pct}%</span>
+  _renderProgressBar(pct) {
+    const level = this._progressLevel(pct);
+    return `<div class="dim editable" data-field="progress" data-level="${level}" title="拖动调整进度，当前 ${pct}%">
+      <span class="dim-line">
+        <span class="dim-tick"></span>
+        <span class="dim-track"><i class="dim-fill" style="width:${pct}%"></i><b class="dim-thumb" style="left:${pct}%"></b></span>
+        <span class="dim-tick"></span>
+      </span>
+      <span class="dim-val">${pct}<i>%</i></span>
     </div>`;
   },
 
-  _formatDatePair(start, end) {
-    const s = WeekUtils.formatShortDate(start);
-    const e = WeekUtils.formatShortDate(end);
-    if (!s && !e) return '<span class="placeholder">日期</span>';
-    if (!s) return '~' + e;
-    if (!e) return s + '~';
-    return s + ' — ' + e;
-  },
-
-  _formatSingleDate(dateStr, label) {
-    const s = WeekUtils.formatShortDate(dateStr);
-    return s || `<span class="placeholder">${label}</span>`;
-  },
-
-  _bindCardEvents(card) {
-    // Delete button
-    const delBtn = card.querySelector('.card-del');
-    if (delBtn) {
-      delBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const taskId = delBtn.dataset.taskId;
-        if (confirm('确定删除此任务？')) {
-          Actions.deleteTask(taskId);
-        }
-      });
-    }
-
-    // Editable fields — click to edit
-    card.querySelectorAll('.editable').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (el.classList.contains('editing')) return;
-        Editor.startEdit(el, card);
-      });
-    });
+  _formatSingleDate(dateStr) {
+    if (!dateStr) return '<span class="placeholder">·····</span>';
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return esc(dateStr);
+    const p = n => String(n).padStart(2, '0');
+    return p(d.getMonth() + 1) + '.' + p(d.getDate());
   },
 
   // DOM patch a single card element
@@ -1113,42 +1385,37 @@ const Renderer = {
     const task = DataModel.state.tasks.find(t => t.id === taskId);
     if (!task) return;
 
-    // Update name
-    const nameEl = card.querySelector('[data-field="name"]');
-    if (nameEl) nameEl.innerHTML = task.name || '<span class="placeholder">点击输入任务名</span>';
+    card.dataset.status = task.status;
 
-    // Update priority
+    const nameEl = card.querySelector('[data-field="name"]');
+    if (nameEl) nameEl.innerHTML = task.name ? esc(task.name) : '<span class="placeholder">点击输入任务名称</span>';
+
     const prioEl = card.querySelector('[data-field="priority"]');
     if (prioEl) {
       prioEl.textContent = task.priority;
-      prioEl.className = `prio-badge ${C.PRIO_CLASSES[task.priority]} editable`;
+      prioEl.className = `prio-badge ${C.PRIO_CLASSES[task.priority] || ''} editable`;
+      prioEl.dataset.code = C.PRIO_CODES[task.priority] || '';
       prioEl.dataset.field = 'priority';
     }
 
-    // Update progress bar
     const progEl = card.querySelector('[data-field="progress"]');
     if (progEl) progEl.outerHTML = this._renderProgressBar(task.progress);
 
-    // Update status
     const statusEl = card.querySelector('[data-field="status"]');
     if (statusEl) {
       statusEl.textContent = task.status;
-      statusEl.className = `status-badge ${C.STATUS_CLASSES[task.status]} editable`;
+      statusEl.className = 'status-badge editable';
+      statusEl.dataset.status = task.status;
       statusEl.dataset.field = 'status';
     }
 
-    // Update dates
     const startDateEl = card.querySelector('[data-field="startDate"]');
-    if (startDateEl) startDateEl.innerHTML = this._formatSingleDate(task.startDate, '开始');
+    if (startDateEl) startDateEl.innerHTML = this._formatSingleDate(task.startDate);
     const dueDateEl = card.querySelector('[data-field="dueDate"]');
-    if (dueDateEl) dueDateEl.innerHTML = this._formatSingleDate(task.dueDate, '结束');
+    if (dueDateEl) dueDateEl.innerHTML = this._formatSingleDate(task.dueDate);
 
-    // Update notes
     const notesEl = card.querySelector('[data-field="notes"]');
-    if (notesEl) notesEl.innerHTML = task.notes || '<span class="placeholder">备注</span>';
-
-    // Re-bind events
-    this._bindCardEvents(card);
+    if (notesEl) notesEl.innerHTML = task.notes ? esc(task.notes) : '<span class="placeholder">备注 / NOTES</span>';
   },
 };
 
@@ -1187,11 +1454,6 @@ const Editor = {
       el.appendChild(sel);
       sel.focus();
       this._bindSelectEvents(sel, el, card);
-      return;
-    }
-
-    if (field === 'progress') {
-      this._startProgressDrag(el, card, raw);
       return;
     }
 
@@ -1292,74 +1554,64 @@ const Editor = {
     }
   },
 
-  _dragTaskId: null,
-  _dragValue: 0,
-  _dragStartX: 0,
+  // 尺寸标注线拖动：以 pointerdown 落点为基准做相对位移，
+  // 保持手机端可微调（不跳变到触摸位置）。
+  beginDrag(el, card, e) {
+    if (this.currentField && this.currentField !== el) this.cancelEdit(false);
+    const track = el.querySelector('.dim-track');
+    const task = DataModel.state.tasks.find(t => t.id === card.dataset.taskId);
+    if (!track || !task) return;
 
-  _startProgressDrag(el, card, initialValue) {
-    const taskId = card.dataset.taskId;
-    this._dragTaskId = taskId;
-    this._dragValue = initialValue;
-    el.classList.add('editing');
+    this.currentCard = card;
+    this.currentField = el;
+    el.classList.add('editing', 'dragging');
 
-    const onDown = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      el.setPointerCapture(e.pointerId);
-      this._dragStartX = e.clientX;
-      this._dragValue = initialValue;
-      const inner = el.querySelector('.prog-inner');
-      if (inner) inner.style.filter = 'brightness(1.2)';
-      el.addEventListener('pointermove', onMove);
-      el.addEventListener('pointerup', onUp);
-    };
+    const startX = e.clientX;
+    const startVal = task.progress;
+    const span = Math.max(track.getBoundingClientRect().width, 24);
+    let live = startVal;
 
-    const onMove = (e) => {
-      e.preventDefault();
-      const dx = e.clientX - this._dragStartX;
-      const rect = el.getBoundingClientRect();
-      const pctDelta = (dx / rect.width) * 100;
-      let newVal = Math.round(initialValue + pctDelta);
-      newVal = Math.max(0, Math.min(100, newVal));
-      if (newVal !== this._dragValue) {
-        this._dragValue = newVal;
-        this._updateProgressBar(el, newVal);
+    const onMove = (ev) => {
+      ev.preventDefault();
+      const next = Math.max(0, Math.min(100, Math.round(startVal + ((ev.clientX - startX) / span) * 100)));
+      if (next !== live) {
+        live = next;
+        this._updateProgressBar(el, next);
       }
     };
 
-    const onUp = (e) => {
-      el.releasePointerCapture(e.pointerId);
+    const stop = (ev) => {
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
-      el.classList.remove('editing');
-      const inner = el.querySelector('.prog-inner');
-      if (inner) inner.style.filter = '';
-      this._commit(card, el, this._dragValue);
+      el.removeEventListener('pointercancel', onUp);
+      if (el.hasPointerCapture && el.hasPointerCapture(ev.pointerId)) el.releasePointerCapture(ev.pointerId);
+      el.classList.remove('editing', 'dragging');
+      el._dragCleanup = null;
     };
 
-    el.addEventListener('pointerdown', onDown);
-    // Store cleanup ref on the element
-    el._dragCleanup = () => {
-      el.removeEventListener('pointerdown', onDown);
-      el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerup', onUp);
-      el.classList.remove('editing');
+    const onUp = (ev) => {
+      stop(ev);
+      this._commit(card, el, live);
     };
+
+    // 指针已失效时 setPointerCapture 会抛错，不能让它中断监听绑定
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onUp);
+
+    el._dragCleanup = () => stop(e);
   },
 
   _updateProgressBar(el, pct) {
-    let color = 'var(--progress-mid)';
-    if (pct >= 70) color = 'var(--progress-high)';
-    else if (pct <= 30 && pct > 0) color = 'var(--progress-low)';
-    else if (pct === 0) color = 'transparent';
-    const inner = el.querySelector('.prog-inner');
-    if (inner) {
-      inner.style.width = pct + '%';
-      inner.style.background = color;
-      inner.style.minWidth = pct === 0 ? '0' : '';
-    }
-    const label = el.querySelector('.prog-label');
-    if (label) label.textContent = pct + '%';
+    const fill = el.querySelector('.dim-fill');
+    const thumb = el.querySelector('.dim-thumb');
+    const val = el.querySelector('.dim-val');
+    if (fill) fill.style.width = pct + '%';
+    if (thumb) thumb.style.left = pct + '%';
+    if (val) val.innerHTML = pct + '<i>%</i>';
+    el.dataset.level = Renderer._progressLevel(pct);
+    el.title = `拖动调整进度，当前 ${pct}%`;
   },
 
   cancelEdit(restore = true) {
@@ -1383,16 +1635,18 @@ const Editor = {
   _refreshColumnCount() {
     const weekStr = DataModel.state.currentWeek;
     C.MEMBERS.forEach((person, i) => {
-      const count = DataModel.getTasksByPerson(weekStr, person).length;
-      const header = document.querySelector(`#col-body-${i}`)?.previousElementSibling;
+      const tasks = FilterState.apply(DataModel.getTasksByPerson(weekStr, person));
+      const done = tasks.filter(t => t.status === '已完成').length;
+      const rate = tasks.length > 0 ? Math.round(done / tasks.length * 100) : 0;
+      const header = document.querySelector(`#column-${i} .column-header`);
       if (header) {
         const countEl = header.querySelector('.task-count');
-        if (countEl) countEl.textContent = count + ' 项';
+        if (countEl) countEl.innerHTML = `${tasks.length}<i>项</i>`;
+        const subEl = header.querySelector('.ph-sub');
+        if (subEl) subEl.innerHTML = `完成 <b>${done}</b> · ${rate}%`;
       }
       const body = document.getElementById(`col-body-${i}`);
-      if (body) {
-        body.classList.toggle('empty', count === 0);
-      }
+      if (body) body.classList.toggle('empty', tasks.length === 0);
     });
     Renderer.renderStats(weekStr);
   },
@@ -1440,22 +1694,28 @@ const Actions = {
     const deleted = DataModel.state.tasks.splice(idx, 1)[0];
     DataModel._save();
     Renderer.renderAll(DataModel.state.currentWeek);
-    Toast.showUndo('任务已删除', () => {
+    Toast.showUndo(`已删除「${deleted.name || '未命名任务'}」`, () => {
       DataModel.state.tasks.push(deleted);
       DataModel._save();
       Renderer.renderAll(DataModel.state.currentWeek);
       Toast.show('已恢复任务');
-    });
+    }, 8000);
   },
 
   copyFromPrev() {
-    const count = DataModel.copyIncompleteFromPrev(DataModel.state.currentWeek);
-    if (count > 0) {
-      Renderer.renderAll(DataModel.state.currentWeek);
-      Toast.show(`已复制 ${count} 个未完成任务`);
-    } else {
-      Toast.show('上周没有未完成的任务');
+    const { copies, skipped } = DataModel.copyIncompleteFromPrev(DataModel.state.currentWeek);
+    if (copies.length === 0) {
+      Toast.show(skipped > 0 ? `上周未完成任务本周已存在` : '上周没有未完成的任务');
+      return;
     }
+    Renderer.renderAll(DataModel.state.currentWeek);
+    const ids = new Set(copies.map(c => c.id));
+    Toast.showUndo(`已复制 ${copies.length} 个未完成任务`, () => {
+      DataModel.state.tasks = DataModel.state.tasks.filter(t => !ids.has(t.id));
+      DataModel._save();
+      Renderer.renderAll(DataModel.state.currentWeek);
+      Toast.show('已撤销复制');
+    }, 8000);
   },
 };
 
@@ -1464,23 +1724,51 @@ const Actions = {
 // ======================================================================
 const App = {
   async init() {
+    this.initTheme();
     // Load local first for instant render
     const state = Storage.load();
+    // 周次属于视图状态而非数据：每次打开页面都落在本周，不沿用上次浏览位置
+    state.currentWeek = Storage.getDefault().currentWeek;
     DataModel.init(state);
     this.bindToolbar();
     this.bindBoardDelegation();
     this.bindSettings();
     this.bindGlobalKeys();
     this.bindSaveBtn();
+    this.bindTheme();
     Renderer.renderAll(DataModel.state.currentWeek);
 
     // Then attempt remote sync (always configured with defaults)
     SyncStatus.showConfigured();
-    const merged = await Storage.loadAsync();
+    const merged = await Storage.loadAsync(state);
     if (merged !== state) {
       DataModel.init(merged);
       Renderer.renderAll(DataModel.state.currentWeek);
     }
+  },
+
+  initTheme() {
+    let saved = null;
+    try { saved = localStorage.getItem(C.THEME_KEY); } catch (e) {}
+    if (!saved) {
+      saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'blueprint' : 'paper';
+    }
+    this._applyTheme(saved);
+  },
+
+  _applyTheme(mode) {
+    if (mode === 'blueprint') document.body.dataset.theme = 'blueprint';
+    else delete document.body.dataset.theme;
+  },
+
+  bindTheme() {
+    document.getElementById('btn-theme').addEventListener('click', () => {
+      const next = document.body.dataset.theme === 'blueprint' ? 'paper' : 'blueprint';
+      this._applyTheme(next);
+      try { localStorage.setItem(C.THEME_KEY, next); } catch (e) {}
+      Toast.show(next === 'blueprint' ? '蓝图夜览' : '图纸日览');
+    });
   },
 
   bindToolbar() {
@@ -1512,11 +1800,29 @@ const App = {
   },
 
   bindBoardDelegation() {
-    document.getElementById('board').addEventListener('click', (e) => {
-      const btn = e.target.closest('.btn-add-person');
-      if (btn) {
-        Actions.addTask(btn.dataset.person);
-      }
+    const board = document.getElementById('board');
+
+    board.addEventListener('click', (e) => {
+      const add = e.target.closest('.btn-add-person');
+      if (add) { Actions.addTask(add.dataset.person); return; }
+
+      const del = e.target.closest('.card-del');
+      if (del) { Actions.deleteTask(del.dataset.taskId); return; }
+
+      const el = e.target.closest('.editable');
+      // 尺寸线由 pointerdown 接管，不参与 click 编辑
+      if (!el || el.dataset.field === 'progress') return;
+      if (el.classList.contains('editing')) return;
+      Editor.startEdit(el, el.closest('.task-card'));
+    });
+
+    // 按住尺寸线即可拖动，无需先点击激活
+    board.addEventListener('pointerdown', (e) => {
+      if (e.button > 0) return;
+      const dim = e.target.closest('.dim');
+      if (!dim) return;
+      e.preventDefault();
+      Editor.beginDrag(dim, dim.closest('.task-card'), e);
     });
   },
 
