@@ -2,18 +2,19 @@
 
 功能清单看 [README.md](./README.md)，这里只记**过程**：为什么做成这样、哪些结论被推翻过、验证要靠什么手段、还剩什么没做。
 
-最后更新：2026-09-21（深夜）。出图重做成图册（多周连排 / 按人成册 / 图纸目录 / 配平）+ 占位页，本轮前五份提交已 push 并按「比内容不比状态码」复核过；**版面留档补上了**（六张出图 + 一份版面读数 JSON），代价是装了一套无头 Chromium，收获是看图当场揪出两条观感缺陷（图签栏浮在纸中间、纸上印着编辑提示）——修复与留档已提交并 push（`2e0efe9` `88703e5` `4b3facb`），Pages 内容与本地逐字节一致，两条修复在真站点的只读冒烟里也验过。
+最后更新：2026-09-21 深夜（第二轮）。留档缺口补齐（晒图设置对话框 / 拖拽进行中 / 手机整页长版面三张，共十四张），并把出图**真出成 PDF 数了页数**——当场抓到一条 CSS 特异性导致的**分页缺陷**：只要纸铺在预览层里，打印时第一张之后的纸会**静默消失**，不报错、屏上也看不出异常。修复只动 `@media print` 里那一条规则（+8/−3，其中 5 行是解释注释），一行 JS 没动，四种排法现在 9→9、9→9、1→1、1→2 页全部对上账。缺陷随预览层一起进来（`git log -S` 指到 `18d9a47`），到 `bc20985` 为止都在线上；修复随 `ebf3016` 提交、本轮 push。上一轮：图册版出图 + 占位页已 push 并复核，两条观感修复见「关键决策」第 9 条。
 
 ## 当前状态
 
 | | |
 | --- | --- |
-| 线上版本 | `4b3facb`（= `origin/main`：图册版出图 + 占位页 + 两条观感修复 + 版面留档）。push 后轮询 Pages：第 1 次仍是上一版 `e891f144…` / 170484 字节，**第 2 次（约 20s 后）就是 `cbf55842ee0e4264cf5e7e92860e920f` / 171477 字节，与本地 `index.html` 逐字节一致**；再独立 grep 那份产物确认两条新规则真在里面（`（未命名）` 命中 2 处、`.sheet-page > .sheet-board…` 与 `flex: 1 1 auto` 各 1 处），最后用 `.preview/live_smoke_sheet.py` 在真站点上做只读冒烟：13 条请求**全是 GET**（唯一一条 `api.github.com` 是匿名读 Gist），图签栏距纸底恒等于 18px 下内边距、编辑提示可见数 0。这个比对口径每轮上线后都该做一次，命令见「怎么验证」 |
+| 线上版本 | 本轮 push 三份：`ebf3016`（分页修复）+ `cf4bacd`（留档三张）+ 本份文档；push 之前 `origin/main` = `bc20985`。上一轮 `4b3facb` 的 push 复核留作口径参照：轮询 Pages 第 1 次仍是上一版 `e891f144…` / 170484 字节，**第 2 次（约 20s 后）就是 `cbf55842ee0e4264cf5e7e92860e920f` / 171477 字节，与本地 `index.html` 逐字节一致**；再独立 grep 那份产物确认两条新规则真在里面（`（未命名）` 命中 2 处、`.sheet-page > .sheet-board…` 与 `flex: 1 1 auto` 各 1 处），最后用 `.preview/live_smoke_sheet.py` 在真站点上做只读冒烟：13 条请求**全是 GET**（唯一一条 `api.github.com` 是匿名读 Gist），图签栏距纸底恒等于 18px 下内边距、编辑提示可见数 0。这个比对口径每轮上线后都该做一次，命令见「怎么验证」 |
+| ⚠ 分页缺陷（本轮修） | **线上从 `18d9a47` 起带的缺陷**：只要纸铺在预览层里（点「预览 → 晒图」，或直接开 `?sheet` 直链），打印/另存 PDF 时**第一张之后的纸静默消失**——`body.sheet-preview #print-stack` 特异性压过了 `@media print` 的复位，容器到打印时仍是 `position:fixed` 的一屏。九张纸的册子只能出一张，屏上看不出任何异常；绕过预览层按 Cmd+P 反而正常。修复见 `ebf3016` 与「关键决策」第 10 条 |
 | 数据 schema | v3（带 `tombstones`），可读 v1/v2 并自动升级 |
 | 云端数据 | 69 条任务，覆盖 2026-W21 … W29 |
 | 同步 | 已打通。一次真实 PATCH 验证过非破坏性（69→69，0 条增删，只有 `order` 字段补齐、`currentWeek` W29→W39） |
-| 出图 | 从「单张 A3 + 底部图签」升级为**图册**：按周连排或按人成册，1–8 周，可加图纸目录页，逐张配平缩放，零张纸时出「此页无图」占位页 |
-| 待办 | 版面留档**已补**（六张出图 + `docs/sheet-facts.json`），还缺拖拽中 / 手机长版面 / 出图对话框三张；另外三位同事还没各自配 Token（详见文末「还欠着的」） |
+| 出图 | 从「单张 A3 + 底部图签」升级为**图册**：按周连排或按人成册，1–8 周，可加图纸目录页，逐张配平缩放，零张纸时出「此页无图」占位页。**出纸已按真 PDF 数过页数**（四种排法 9/9/1/2 页，全部 A3 横排，0 空白页） |
+| 待办 | 版面留档**已补齐**（十四张 + `docs/sheet-facts.json` 九条读数）；分页修复已提交，push 后照例比 md5 复核上线；另外三位同事还没各自配 Token；真机 Safari/iOS 的打印没验过（详见文末「还欠着的」） |
 
 ## 时间线
 
@@ -40,6 +41,8 @@
 | `9c982bc` | 2026-09-21 深夜 | 这两份文档补上图册与占位页的决策、数字、自证方法；连同上一个提交一起 push，并按「比内容不比状态码」复核上线 |
 | `b466a50` | 2026-09-21 21:31 | 只动文档：记下占位页在真站点的只读复核，以及 Pages 缓存翻转的实测秒数（前两次约 45s 仍是旧版） |
 | `2e0efe9` `88703e5` `4b3facb` | 2026-09-21 深夜 | **版面留档 + 两条观感修复**：`.preview/shoot.py`（无头 Chromium 出图留档，仓库外）拍六张进 `docs/screenshots/`，版面读数落 `docs/sheet-facts.json`；看图当场揪出「图签栏浮在纸中间」和「纸上印着编辑提示」，`index.html` 只加 12 行 CSS（`flex:1 1 auto` 贴下边线、`.placeholder` 隐藏 + `:has()` 补 `（未命名）`），**配平数字一位没变**。三份一起 push，Pages 第 2 次轮询（约 20s）即与本地一致 |
+| `bc20985` | 2026-09-21 深夜 | 只动文档：把「当前状态」从待办口径改成实际上线复核口径（第 2 次轮询即一致 + 真站点只读冒烟断言） |
+| **`ebf3016` `cf4bacd`** + 本份 | 2026-09-21 深夜 | **修掉一条分页缺陷**：`.preview/pdf_sheet.py` 把出图真跑成 PDF 数页数，发现四种排法全部只出 1 页——`body.sheet-preview #print-stack` 特异性压过 `@media print` 的复位，从预览层出纸时第一张之后的纸静默消失。`index.html` 只动那一条规则（+8/−3，其中 5 行是注释），修后 9→9、9→9、1→1、1→2 页、0 空白页；harness 侧两次改 `build.py`（补屏上复位 + print 复制收窄成 `@media screen`），九张留档图重跑后八张逐字节相同，第九张只换了目录页脚的生成时间。同时补齐留档三张（对话框 / 拖拽中 / 手机长版面）+ 纸面对比度审计（43/39/10 类文字，0 未达标，最紧 5.42:1） |
 
 ## 关键决策与被推翻的假设
 
@@ -111,6 +114,27 @@ v2 的 merge 是「id 取并集 + `updatedAt` 新的赢」，这个语义下**�
 
 **判断规矩**：`fit()`、`scrollWidth` 这类量能证明版面**没坏**，不能证明它**好看**。这个项目卖的就是图纸观感，留档因此不是收尾的仪式，是第三双眼睛。反过来也成立：**别为了凑一张图去拍一个不存在的状态**——原计划里有一张「蓝图主题下的占位页」，读完 `#print-stack` 那段令牌覆写才知道根本拍不出来（晒图一律走白，见「测量陷阱」第 8 条），于是那张图被删掉，事实改用两个 measured 颜色值记在下面的留档段里。
 
+### 10. 出纸必须真数页数：屏上量 print CSS 量不出分页
+
+第 9 条说像素能抓观感，这条更狠：**像素也抓不到「纸少了」**。留档补齐后我把出图真跑成了 PDF（`.preview/pdf_sheet.py`，`page.pdf({prefer_css_page_size:true, print_background:true})` + `emulate_media('print')`），拿页数对账，结果四种排法**全部只出 1 页**——按周连排八周本该 9 张纸（8 张周页 + 目录），PDF 里就 1 页。而此前所有断言全绿：卡数、自然高、`--fc`、`is-spill`、摘要文案、纸面尺寸，一项没错。
+
+原因是 CSS 特异性：预览层写着 `body.sheet-preview #print-stack{position:fixed;inset:0;overflow:auto}`（id + class），`@media print` 里压它的那条只有 `#print-stack`（id）——**压不住，`fixed` 一直活到打印**。打印机于是只看得见那一屏：第一张纸之后，剩下的纸**静默消失，一句错都不报**。修法就是把选择器写全并加 `!important`（含 `inset:auto`）：
+
+```css
+#print-stack, body.sheet-preview #print-stack {
+  display: block !important; position: static !important; inset: auto !important;
+  overflow: visible !important; background: #fff; padding: 0 !important;
+}
+```
+
+三层值得记住：
+
+1. **屏上怎么量都是对的**。`?sheet` 直链和点「预览」走的是同一个 `SheetSet.preview()`，`body.sheet-preview` 都在（`index.html:3209` → `2530`），而 `position:fixed` 在**屏上正是想要的**——所以留档、`verify_sheet.py`、真站点冒烟量到的版面全对，缺陷只存在于打印媒体里：那一屏之外没有第二屏，`page.pdf()` 就只写出一页。之前所有验证一次都没碰到 `emulate_media('print')`，所以谁也没看见。**唯一没中招的是绕过预览层那条路**：直接按 Cmd+P 时 `beforeprint` 只 `build()` 铺纸、不加 `sheet-preview`（`index.html:2666`），旧的 `#print-stack{position:static}` 正好生效、九张纸照出——「按晒图按钮只出一张，Cmd+P 却正常」这种分裂表现，是这类特异性 bug 的典型指纹。三条对照跑在 `.preview/ab_print_path.py` 里（同一份 HTML、同一个八周配置，print 媒体下读 computed 再数页数）：A 预览层 + 现状 CSS → `static/visible` → **9 页**；B 同一页面运行时把 `position:fixed !important` 按回来（模拟修复前的级联）→ **1 页**；C 不带 `sheet-preview` → `static/visible` → **9 页**。B 是因果证据：少页不是分页算法的问题，就是这一条声明。
+2. **修好之后，量具自己把这个 bug 又遮回去了一次**。`?sheet` 模式把 `@media print` 整段抄成 screen 媒体，抄过来的那条 `#print-stack{position:static}` 在屏上把预览层压成了静态流（截出的图全不对）——于是给 `build.py` 补了一条 harness-only 复位，让屏上预览层恢复真实的 `fixed` 自滚动。但那条复位最初写成裸规则、复制出的媒体块用的也是 `@media all`，**两者在打印媒体下同样成立**，结果 `page.pdf()` 又变回 1 页——修好的缺陷被量具遮住了，而 `pdf-facts.json` 里那份「9 页」是改量具之前跑出来的，差点就这么交上去。**教训两条**：harness 里所有 print 相关的复制一律写 `@media screen`；任何让 print CSS 在屏上生效的装置，都不能同时用来验证「分页」——要数页数就老老实实在 `emulate_media('print')` 下出一张真 PDF，而且**换完量具要重跑被测项**。
+3. 它和第 8 条那句「空态不是错误态」、以及那个掩盖了两个月的「✓ 已同步」是**同一类失败**：没有异常、没有报错、界面上看着有内容，只有把最终产物数一遍才露馅。**判断规矩**：出纸这种「一份变 N 份」的东西，回归断言里必须有一个 N，而且要来自最终产物（页数），不是来自计划（`plan.sheets`）。计划本身也可以是对的而产物是错的——这次就是。
+
+修完的四案例对账（`.preview/out/pdf-facts.json`，口径是 `plan.sheets` → DOM `.sheet-paper` 数 → **PDF 页数**）：按周连排八周 8→9→9、按人成册两周 8→9→9（差的那 1 张是目录页，`plan.sheets` 从来不数它）、占位页 0→1→1、溢出那例 **1→1→2**——摘要说「出纸会续页」，真出了两页，这个承诺在真分页里兑现了。四种排法全部 420×297mm，0 张空白页。顺带量到一个待办：溢出那例的**续页上带着图签栏**（内容块整块往下流，图签栏跟着跑到第二页）——说明今天的是**溢出分页**，不是真正的**跨页续排**，见「还欠着的」第 4 条。
+
 ## 怎么验证（离线 harness）
 
 **测试一律跑离线 harness，不要对线上 Gist 做写测试。**
@@ -127,6 +151,10 @@ python3 -m http.server 8899 --bind 127.0.0.1 --directory .preview
 （**别写成 `http.server 8899 … .preview`** —— 这台机器的 Python 3.9 里那个位置参数是 `port`，
 多余的路径会直接 `error: unrecognized arguments`；而 8899 上若还挂着旧服务，
 `curl` 照样回 200，看起来像命令是对的。目录参数只有 `--directory` 一种写法。）
+
+服务起着之后，版面这一侧有五个脚本（都要打码版 `preview-anon.html`，命令集中在文末「版面留档」）：
+`shoot.py` 出留档图 + 读数、`verify_sheet.py` 断言图签栏贴边线与占位文案、`pdf_sheet.py` **真出 PDF 数页数**、
+`ab_print_path.py` 三条对照证明分页的因、`audit_sheet_contrast.py` 逐类量纸面文字对比度。除 A/B 那条（只数页数、没记 `__net`）之外，跑完 `__net` 必须仍是 0。
 
 要产出**能进仓库**的东西（截图、演示）就换成打码种子，别拿 `seed.json` 拍：
 
@@ -199,6 +227,19 @@ http://127.0.0.1:8899/preview.html?sheet&from=2026-W38&count=3&mode=persons
 
 三个读数：**约 13 项**开始掉出 100%（真实板上最满的一周是 11 项，所以日常永远配平 100%，这条曲线只能靠合成任务拍到）；**25 项**撞下限 `0.66`；**66% 能吞下的最大自然高是 1586px**（= 1047 ÷ 0.66），超过就是「压不动了，出纸会续页」——留档那两张分别停在曲线的 21 项和 33 项上。
 
+留档补齐那一轮（对话框 / 拖拽中 / 手机长版面），顺带把**真出纸**和**纸面配色**各量了一遍：
+
+| 案例（打码种子） | `plan.sheets` | 屏上纸张 DOM | **PDF 实际页数** | 页面尺寸 | 空白页 |
+| --- | --- | --- | --- | --- | --- |
+| 按周连排 8 周 + 目录 | 8 | 9 | **9** | 420×297mm | 0 |
+| 按人成册 2 周 + 目录 | 8 | 9 | **9** | 420×297mm | 0 |
+| 占位页（`from=2019-W52&count=2&mode=persons&scope=open`） | 0 | 1 | **1** | 420×297mm | 0 |
+| 33 项溢出（`is-spill`，摘要承诺续页） | 1 | 1 | **2** | 420×297mm | 0 |
+
+修复前这一列全是 1（见「关键决策」第 10 条）。跑法：`python3 .preview/pdf_sheet.py`，读数落 `.preview/out/pdf-facts.json` 与 `out/*.pdf`（PDF 和 out/ 都在仓库外）。
+
+纸面对比度（`.preview/audit_sheet_contrast.py`，只审 `.sheet-page` 里的文字，自己做 alpha 合成、跳过 `aria-hidden`）：三种版面分别 **43 / 39 / 10 类文字，未达标 0 类**；最紧的是 `span.prio-badge.prio-med` 与 `span.chip.new` 的 **5.42:1**（`rgb(138,99,16)` 压白底，8.5–9.5px），门槛按 AA 小字 4.5 算，全部纸面文字 **≥ 5.42**。纸面恒白（`rgb(255,255,255)`）所以这个数与主题无关，蓝图夜览下也一样，见「测量陷阱」第 8 条。
+
 **线上只读冒烟是可以做的**：`https://yiyuqiao2748.github.io/weekly-tracker/` 打开后只发生匿名 GET，`reachable` 闸门保证不会盲推；但**别在真站点上改数据或点「保存并同步」**，要验证上传路径仍然回 `?sync=1`。
 
 push 完在真站点上复核过两件事（全程只读，控制台零条消息）：
@@ -219,10 +260,14 @@ push 完在真站点上复核过两件事（全程只读，控制台零条消息
 9. **`?sheet` 直链页面里没有预览条**，因为它被 print 规则一起复制过来了。harness 把 `@media print` 的整段规则改成 screen 媒体（这是让 `?sheet` 能直接截图的机制），而 `@media print { #sheet-preview-bar { display:none } }` 也在其中，并带 `!important`。所以拍「配平 72%」那类要含预览条的图，**只能走不带 `?sheet` 的路**：`SheetSet.preview(cfg)` 从 JS 里铺纸（`shoot.py` 的 STRESS 那两类就是这么拍的）。同理别用 `#print-stack` 之外的元素判断预览是否生效。
 10. **预览层是自滚动容器，截图的 clip 不能按页面坐标算**。`#print-stack` 是 `position:fixed; inset:0; overflow:auto`：`window.scrollY` **永远是 0**，要拍第 N 张纸必须滚 `#print-stack.scrollTop` 本身，坐标才是视口相对的；`full_page:true` 在这里只会拿到一屏。另外 clip 越界 Chromium 直接报 `Clipped area is either once outside the resulting image`（不是截断，是失败），所以 clip 的 `y+height` 要 `min(…, viewportHeight)` 夹一道，预览条这种 fixed 通栏元素得按**整个视口宽**裁（按纸的 x 裁会把「N 张 · A3 横排」那半句切掉）。
 11. **`/tmp` 下的脚本别用 stdlib 模块名**：那份探针写了 `/tmp/struct.py`，`import` 时把标准库 `struct` 顶掉，报错是别处的 `ImportError`/循环导入，看起来像环境问题。同理 `.preview/` 里的文件名会进 `sys.path[0]`，别起名叫 `types.py` / `json.py`。
+12. **判断 PDF 空白页别量 content stream 字节数**。第一版用「内容流 < 40 字节算空白页」，误报了好几页——一张只有细线网格的纸能很小，一张全是文字的纸也可能被压缩得很好。**用 `pypdf` 的 `extract_text().strip()` 是否为空**：语义对（没字儿的纸才叫空白），而且顺带证明字体真的嵌进去了。
+13. **手机整页截图有两个坑，都是「只截到一屏」**。`#board` 自己是内层滚动容器（`overflow:auto`），文档高度并不包含超出的人列，`full_page:true` 拿到的仍是一屏——要注入 `html,body{height:auto;overflow:visible}` + `#board{flex:none;height:auto;overflow:visible}` 把内层滚动摊平（跟 `@media print` 对 `#print-stack` 做的事一模一样）。摊平之后又冒出第二个：`position:fixed` 的悬浮保存条在整页图里会**漂到页尾**盖住最后一列，所以留档注入 `.hide`，并在 facts 里写明这是拍摄装置、不是产品行为（产品上它本来就只在待存时出现）。
+14. **拖拽中的版面造不出来，除非你真的拖**。`dispatchEvent(new DragEvent(...))` 不会走 HTML5 拖拽那条原生链路，卡片的 `is-dragging` 姿态量不到。可行的是无头浏览器里发真指针：`mouse.move(卡的中心) → mouse.down()`，**先步进 10px 级别的小位移越过代码里那个 6px 拖拽阈值**，再步进到目标列，截图，最后 `mouse.up()` 收尾（别留一个拖到一半的状态给下一张图）。断言读 `getComputedStyle` 的 `transform` 矩阵与兄弟卡 `opacity`（本轮：被拖卡 `matrix(0.999962,-0.00872654,…)` 即抬起微旋，兄弟 `0.5`）。
+15. **量具会自己制造假阴性**。`.preview/build.py` 里把 `@media print` 抄到屏上的那段，复制出来的媒体块必须写 `@media screen`、harness 的复位规则也要包在 `@media screen{}` 里；写成 `@media all` 或裸规则，它在**打印媒体下同样成立**，`page.pdf()` 就又被按回 1 页——刚修好的分页缺陷被量具遮住，而旧 `pdf-facts.json` 里躺着改量具之前跑出的「9 页」，看着全绿。**规矩**：动过 harness 就把被测项重跑一遍，别引用上一轮的产物文件。
 
 ## 版面留档（截图）
 
-`docs/screenshots/` 十一张，分两批。19:00 那批五张拍的是**看板**（日览 / 蓝图 / 修订表 / 手机 390），仍然有效；其中 `2026-09-21-print-sheet-a3.png` **已过期**（`744ccd2` 的旧 2×2 单张版面），只留着跟新出图图对照。22:00 那批六张是本轮的**图册版出图**。
+`docs/screenshots/` 十四张，分三批。19:00 那批五张拍的是**看板**（日览 / 蓝图 / 修订表 / 手机 390），仍然有效；其中 `2026-09-21-print-sheet-a3.png` **已过期**（`744ccd2` 的旧 2×2 单张版面），只留着跟新出图图对照。22:00 那批六张是**图册版出图**。23:00 那批三张补齐了缺口：**晒图设置对话框、拖拽进行中、手机整页长版面**。
 
 **图里的项目名是假的。** 板子上跑的是打码种子：`.preview/anonymize_seed.py` 把 `seed.json` 的 `name` / `notes` 换成「示例项目 A…U」「对接人 A…G」（长度尽量与原句相当，免得换行位置变了），真实客户名、分店地名、对接人姓名只存在于云端 Gist 和各自浏览器的 localStorage，不进仓库。备注里的纯工作描述（`第4稿`、`换场地`、`明档修改中`）不含客户信息，原样留着。
 
@@ -233,7 +278,11 @@ python3 .preview/anonymize_seed.py                                   # → .prev
 python3 .preview/build.py .preview/seed-anon.json .preview/preview-anon.html
 python3 -m http.server 8899 --bind 127.0.0.1 --directory .preview &  # 服务起着
 python3 .preview/shoot.py                                            # → docs/screenshots/ + docs/sheet-facts.json
+python3 .preview/shoot.py --only dialog                              # 只拍文件名含 "dialog" 的那张（调试用，不覆写 facts）
 python3 .preview/verify_sheet.py                                     # 改 CSS 后跑它，别只信眼睛
+python3 .preview/pdf_sheet.py                                        # 真出纸：数 PDF 页数，见决策 10
+python3 .preview/ab_print_path.py                                    # A/B/C 对照：分页的因是不是那条 fixed
+python3 .preview/audit_sheet_contrast.py                             # 纸面文字逐类算对比度
 ```
 
 `shoot.py` 走的是无头 Chromium（Playwright，`chromium_headless_shell`），**不依赖 In-app Browser 面板在前台**——这是这轮换的手段，理由见「关键决策」第 9 条。它只打打码版：脚本开头有一句 `if "preview-anon" not in base: sys.exit(...)`，防止手滑拿真种子出图。重跑一次 `sheet-facts.json` 逐字节一致（版面读数确定），所以它是可以当回归用的。
@@ -255,20 +304,28 @@ python3 .preview/verify_sheet.py                                     # 改 CSS �
 | ![print sheet](./docs/screenshots/2026-09-21-print-sheet-a3.png) | **已过期**：拍的是 `744ccd2` 的旧晒图版面（2×2 图幅 + 底部单块图签）。现在的出图是四列通栏 + 每张纸各自带图签，还多了目录页与连排/分册两种排法，看上面那批 |
 | ![mobile 390](./docs/screenshots/2026-09-21-mobile-390.png) | 390×844 真实手机版面（同源 iframe 拍的，见 `.preview/mobile-frame.html`）：工具栏换行、人列纵向堆叠、`scrollWidth` 390 = 视口宽，无横向溢出 |
 
-拍摄时统一注入 `transition:none;animation:none`（理由见上面「测量陷阱」第 1 条）。每轮的版面数字（张数、每页卡数、自然高、`fc`、`spill`、摘要原文、纸面/条底色）随图落在 `docs/sheet-facts.json`，比逐张肉眼读图可靠。
+23:00 那批（补齐「还欠着的」里留档那条）：
+
+| 图 | 看什么 |
+| --- | --- |
+| ![sheet dialog](./docs/screenshots/2026-09-21-sheet-dialog.png) | **晒图设置对话框**五格：截止周 / 连排周数（下拉 8 档）/ 分册方式（按周连排 · 按人成册）/ 收录范围（全部 · 只出未完成 · 沿用当前筛选）/ 目录开关，底部摘要 `1 张 · A3 横排 · WTP-2026-W39`。由 `SheetSet.openDialog()` 直接唤起，不用点顶栏 |
+| ![board dragging](./docs/screenshots/2026-09-21-board-dragging.png) | **拖拽进行中**（CAD 选择集的读法）：`示例项目 P（旗舰店）` 正被拖进另一列，卡片抬起微旋（computed `matrix(0.999962,-0.00872654,…)`），同列兄弟淡到 `opacity:0.5`。真指针事件造的态，见「测量陷阱」第 14 条 |
+| ![mobile long](./docs/screenshots/2026-09-21-mobile-board-long.png) | **手机整页长版面** 390×2696：四条人列纵向堆叠（列顶 320 / 624 / 1240 / 2004）、11 张卡、统计条与页脚全在里面，`scrollWidth` 390 = 视口宽。悬浮保存条是拍摄装置注入隐藏的，产品上它只在待存时出现（「测量陷阱」第 13 条） |
+
+拍摄时统一注入 `transition:none;animation:none`（理由见上面「测量陷阱」第 1 条）。每轮的版面数字（张数、每页卡数、自然高、`fc`、`spill`、摘要原文、纸面/条底色）随图落在 `docs/sheet-facts.json`，比逐张肉眼读图可靠；九条记录里 `net` 全 0、`stressLeft` 全 0（压力任务不会漏进留档）。**版面读数是确定的，图不是逐字节确定的**：本轮为修分页两次改过 `build.py`（先加 harness 复位、再把复制媒体从 `all` 收窄成 `screen`），每次重跑九张图，`sheet-facts.json` 一字未变，像素上唯一变化的是目录页脚那句生成时间（`22:15:41` → `23:00:57` → `23:17:25`，逐张比对用 `ImageChops.difference().getbbox()`）——这正好反过来证明两次量具改动都没动到屏上版面。
 
 **蓝图主题下纸面仍然是白的，这是设计不是 bug**：`#print-stack` 就地覆盖了一整套纸面令牌（打印机给不出深蓝底，屏上预览与出纸因此同一份观感）。实测：`theme=blueprint` 时预览条 `rgb(19,40,55)`、纸面 `rgb(255,255,255)`。**别去读 `body` 上的 `--paper-raised`**，它照样是 `#132837`，读了会以为图拍错了。
 
 
 ## 还欠着的
 
-1. **留档还剩的缺口**：拖拽进行中的版面（CAD 选择集观感）没拍；手机版只有一张首屏，长版面没连拍；出图预览层的**对话框**（晒图设置那五格）没拍；`?sheet` 页面上拍不到预览条（见「测量陷阱」第 9 条），要拍得走 STRESS 那条不带 `?sheet` 的路。占位页与配平两端（72% / 66% 下限）本轮已补齐。
-2. **harness 的依赖没纳管**：`shoot.py` 与 `verify_sheet.py` 要 `pip3 install --user playwright` + `python3 -m playwright install chromium`（约 120MB，装在 `~/Library/Caches/ms-playwright`）。`.preview/` 整个目录仍在仓库外，换机器要重建（本轮已经见过一次 iCloud 搬目录）。要不要纳管，用户明确说这轮先改功能。
+1. **留档的缺口本轮已补齐**（对话框 / 拖拽中 / 手机长版面三张，见上面第三张表）。剩下的是**引擎层面的缺口**：所有版面证据都出自无头 Chromium（`chromium_headless_shell`），Safari / iOS 真机一次没跑过——而出图恰好依赖 `:has()`（Safari 15.4+）和浏览器自己的分页实现，Chromium 出 9 页不代表 Safari 出 9 页。真机验一次打印，是这批功能上线后最该补的一眼。
+2. **harness 的依赖没纳管**：`shoot.py` / `verify_sheet.py` / `pdf_sheet.py` / `audit_sheet_contrast.py` 要 `pip3 install --user playwright pypdf` + `python3 -m playwright install chromium`（约 120MB，装在 `~/Library/Caches/ms-playwright`）。`.preview/` 整个目录仍在仓库外，换机器要重建（本轮已经见过一次 iCloud 搬目录）。要不要纳管，用户明确说这轮先改功能。
 3. **团队配 Token**：另外三位同事各刷一次页面，然后各自在 ⚙ 设置里贴 Token 点「保存并同步」（每台浏览器单独配，Token 不共享）。
 4. 未排期的候选方向（四条轨道里「出图模式」这轮落地，剩下的）：
    - 负荷条只有任务数，没有工时维度；
    - 修订表按任务卡展开，还没有按周汇总的全局修订页；
-   - 配平只到「提示续页」，没有真正的**跨页续排**（同一人列自动分到两张纸、第二张标 `SHT 03/13 (续)`）；
+   - 配平只到「提示续页」，没有真正的**跨页续排**。本轮真出 PDF 量到了今天的行为：33 项那一例确实出了两页（承诺兑现），但那是**内容块整体往下流的溢出分页**——第二页上是剩余卡片 **加整块图签栏**，页眉也没有 `SHT 03/13 (续)` 这种张次。真正的续排要把同一人列按卡拆开、每页都带页眉与图签、张次标 `(续)`，并且拆出来的两页仍要各自配平；
    - 目录页只列到「张」，没有按人汇总的横表（谁在哪周有几项没完成）；
    - 墓碑连「谁删的」都不记，若要图纸级的签核链得先给墓碑加字段。
 
