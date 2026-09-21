@@ -680,6 +680,60 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ===== Print — 晒图（A3 横排图纸） ===== */
+#title-block { display: none; }
+@page { size: A3 landscape; margin: 10mm; }
+
+@media print {
+  /* 蓝图夜览不进打印机：强制回到纸面 */
+  :root, body[data-theme="blueprint"] {
+    --paper: #FFFFFF;
+    --paper-raised: #FFFFFF;
+    --paper-sunk: #EDEAE2;
+    --grid: transparent;
+    --grid-bold: transparent;
+    --ink: #1C1A16;
+    --ink-2: #4A463E;
+    --ink-3: #6E6659;
+    --hair: #D8D2C6;
+    --hair-strong: #B4AA97;
+    --shadow-1: none;
+    --shadow-2: none;
+    --hatch: rgba(76, 107, 78, .05);
+  }
+  /* 浏览器默认不打印背景，但剖面线与尺寸线填充是这张图的信息 */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { height: auto; overflow: visible; background: #fff; }
+  body { display: block; background-image: none; }
+  #toolbar, #save-bar, #settings-overlay, #toast, .card-del, .column-footer { display: none !important; }
+  #stats-bar { border-bottom: 1px solid var(--hair-strong); }
+  /* 四列挤一行在 A3 上太窄，改成 2×2 图框 */
+  #board {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6mm 5mm; padding: 5mm 0 0; overflow: visible;
+  }
+  .column { box-shadow: none; break-inside: auto; }
+  .column-body { overflow: visible; padding: 8px 8px 0; }
+  .task-card { break-inside: avoid; box-shadow: none; animation: none; }
+  #title-block {
+    display: flex; flex-wrap: wrap;
+    margin-top: 6mm; border: 1px solid var(--ink);
+  }
+  .tb-cell {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 5px 12px; border-right: 1px solid var(--hair-strong);
+    min-width: 74px;
+  }
+  .tb-cell:last-child { border-right: none; }
+  .tb-cell.grow { flex: 1; }
+  .tb-cell .anno { font-size: 7.5px; letter-spacing: .16em; }
+  .tb-val {
+    font-family: var(--f-mono); font-size: 11px; font-weight: 500;
+    color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .tb-val.zh { font-family: var(--f-display); font-weight: 600; font-size: 12.5px; }
+}
 </style>
 </head>
 <body>
@@ -696,6 +750,7 @@ body {
   </div>
   <button type="button" id="btn-today">回到本周</button>
   <button type="button" id="btn-copy-prev">复制上周未完成</button>
+  <button type="button" id="btn-print" title="打印成 A3 图纸">晒图</button>
   <span class="sep"></span>
   <input type="text" id="search-input" class="search-input" placeholder="搜索任务 / FIND" />
   <div id="status-filters" class="status-filters">
@@ -713,6 +768,7 @@ body {
 <div id="toast"></div>
 <div id="stats-bar"></div>
 <div id="board"></div>
+<div id="title-block"></div>
 
 <div id="save-bar">
   <button type="button" id="btn-save" class="saved">
@@ -1247,6 +1303,27 @@ const Renderer = {
     this.renderToolbar(weekStr);
     this.renderStats(weekStr);
     this.renderBoard(weekStr);
+    this.renderTitleBlock(weekStr);
+  },
+
+  // 图签栏：只在晒图时出现
+  renderTitleBlock(weekStr) {
+    const p = WeekUtils.parseWeekStr(weekStr);
+    const pad = n => String(n).padStart(2, '0');
+    const now = new Date();
+    const cells = [
+      { k: '部门', v: '效果图部门', zh: 1 },
+      { k: '图名', v: p ? `${p.year}年第${p.week}周 任务进度表` : '任务进度表', zh: 1, grow: 1 },
+      { k: '周期', v: WeekUtils.formatDimRange(weekStr) },
+      { k: '图号', v: 'WTP-' + weekStr },
+      { k: '签发', v: `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}` },
+      { k: '比例', v: 'NTS' },
+      { k: '版次', v: 'R1' },
+      { k: '制图', v: C.MEMBERS.join(' · '), zh: 1 },
+    ];
+    document.getElementById('title-block').innerHTML = cells.map(c =>
+      `<div class="tb-cell${c.grow ? ' grow' : ''}"><span class="anno">${c.k}</span>` +
+      `<span class="tb-val${c.zh ? ' zh' : ''}">${esc(c.v)}</span></div>`).join('');
   },
 
   renderToolbar(weekStr) {
@@ -1776,6 +1853,7 @@ const App = {
     document.getElementById('btn-next-week').addEventListener('click', () => Actions.nextWeek());
     document.getElementById('btn-today').addEventListener('click', () => Actions.goToToday());
     document.getElementById('btn-copy-prev').addEventListener('click', () => Actions.copyFromPrev());
+    document.getElementById('btn-print').addEventListener('click', () => window.print());
 
     // Search
     const searchInput = document.getElementById('search-input');
