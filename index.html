@@ -1028,9 +1028,14 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
   body { display: block; background-image: none; }
   #toolbar, #save-bar, #settings-overlay, #sheet-overlay, #toast,
   #stats-bar, #board, #sheet-preview-bar { display: none !important; }
-  #print-stack {
-    display: block !important; position: static; overflow: visible;
-    background: #fff; padding: 0;
+  /* 必须连 `body.sheet-preview #print-stack` 一起写、并且带 !important：
+     预览层那条规则的特异性（id + class）比这里的光 `#print-stack` 高，
+     压不住的话打印时容器仍然是 `position: fixed; overflow: auto` 的一屏，
+     打印机只看得到第一屏 —— 第二张之后的纸**静默消失**，一句错都不报。
+     「预览 → 晒图」正是主路径，2026-09-21 用 page.pdf() 数页数才抓到它。 */
+  #print-stack, body.sheet-preview #print-stack {
+    display: block !important; position: static !important; inset: auto !important;
+    overflow: visible !important; background: #fff; padding: 0 !important;
   }
   /* 屏上的纸边、投影与留白是给眼睛的；出纸只保留分页与配平缩放。
      纸盒尺寸依旧按 --fit 算 —— transform 不改变占位，盒高要跟缩放后的
