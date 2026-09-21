@@ -979,33 +979,76 @@ const GistSync = {
     localStorage.setItem(this.CONFIG_KEY, JSON.stringify(cfg));
   },
 
+  // 用户自己在设置里填过的那份；没填就是空对象。
+  // 不能拿 loadConfig() 的返回值做判断 —— 它会把内置默认值一起兜进来。
+  loadSaved() {
+    try { return JSON.parse(localStorage.getItem(this.CONFIG_KEY)) || {}; }
+    catch { return {}; }
+  },
+
   isConfigured() {
     const cfg = this.loadConfig();
     return !!(cfg.gistId && cfg.token);
   },
 
+  authHeaders() {
+    const h = { Accept: 'application/vnd.github+json' };
+    const token = this.loadSaved().token;
+    if (token) h.Authorization = `Bearer ${token}`;
+    return h;
+  },
+
+  // 本次会话是否真的读到过云端。没读到过的时候本地就是张「过期孤本」，
+  // 任何上传都得先补一次拉取合并 —— 直接推等于用孤本覆盖共享板子。
+  reachable: false,
+
+  // 把远端合进当前看板。所有「先拉后推」的路径都走这里，免得两处各写一遍
+  // merge + save + 重绘，改一处漏一处。
+  applyRemote(remote) {
+    if (!remote) return false;
+    this.reachable = true;
+    const merged = this.merge(DataModel.state, remote);
+    if (merged !== DataModel.state) {
+      DataModel.state = merged;
+      Storage.save(merged);
+      Renderer.renderAll(DataModel.state.currentWeek, true);
+    }
+    return true;
+  },
+
   async pull() {
     const cfg = this.loadConfig();
-    if (!cfg.gistId || !cfg.token) return null;
-    try {
-      const resp = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
-        headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json' },
-      });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const gist = await resp.json();
-      const file = Object.values(gist.files)[0];
-      if (!file || !file.content) return null;
-      const data = JSON.parse(file.content);
-      return data;
-    } catch (e) {
-      console.warn('Gist pull failed:', e.message);
-      return null;
+    if (!cfg.gistId) return null;
+    const url = `https://api.github.com/gists/${cfg.gistId}`;
+    const attempts = [];
+    const savedToken = this.loadSaved().token;
+    if (savedToken) attempts.push({ Authorization: `Bearer ${savedToken}`, Accept: 'application/vnd.github+json' });
+    // 这份 Gist 不记名也可读：token 失效时至少要让大家重新看见同一张板子，
+    // 不能因为 401 就把所有人的视图降级成各自 localStorage 里的孤本。
+    attempts.push({ Accept: 'application/vnd.github+json' });
+    let lastErr = null;
+    for (const headers of attempts) {
+      try {
+        const resp = await fetch(url, { headers });
+        if (!resp.ok) { lastErr = new Error(`HTTP ${resp.status}`); continue; }
+        // 200 就算够得着云端，哪怕文件还没建（新 Gist 首次配置时是这个情况）
+        this.reachable = true;
+        const gist = await resp.json();
+        const file = Object.values(gist.files)[0];
+        if (!file || !file.content) return null;
+        return JSON.parse(file.content);
+      } catch (e) { lastErr = e; }
     }
+    console.warn('Gist pull failed:', lastErr && lastErr.message);
+    return null;
   },
+
+  // 最近一次失败的细节，供状态栏说人话
+  lastError: null,
 
   async push(state) {
     const cfg = this.loadConfig();
-    if (!cfg.gistId || !cfg.token) return false;
+    if (!cfg.gistId || !cfg.token) { this.lastError = 'nosync'; return false; }
     try {
       const content = JSON.stringify(state, null, 2);
       const resp = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
@@ -1015,9 +1058,14 @@ const GistSync = {
           files: { 'weekly-data.json': { content } },
         }),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) {
+        this.lastError = resp.status === 401 || resp.status === 403 ? 'auth' : `http${resp.status}`;
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      this.lastError = null;
       return true;
     } catch (e) {
+      if (!this.lastError) this.lastError = 'network';
       console.warn('Gist push failed:', e.message);
       return false;
     }
@@ -1066,13 +1114,31 @@ const GistSync = {
   async _doPush(state) {
     SaveBtn.setSaving();
     SyncStatus.syncing();
+    if (!this.reachable) {
+      // 一次都没读到过云端：先拉一次，把要上传的东西变成并集；拉不到就干脆不传。
+      const remote = await this.pull();
+      if (!this.reachable) {
+        SaveBtn.setError('net');
+        SyncStatus.error('连不上云端 · 已拒绝上传（避免覆盖别人的板子）');
+        return false;
+      }
+      this.applyRemote(remote);
+      state = DataModel.state;
+    }
     const ok = await this.push(state);
     if (ok) {
       SaveBtn.setSaved();
       SyncStatus.configured();
     } else {
-      SaveBtn.setError();
-      SyncStatus.error('同步失败');
+      const kind = this.lastError === 'auth' ? 'auth' : 'net';
+      SaveBtn.setError(kind);
+      // 只说「同步失败」会让人以为是网不好，白重试半天
+      const why = {
+        auth: 'Token 已失效，只能看不能传 · 重新填 Token',
+        network: '连不上 GitHub · 点击重试',
+        nosync: '未配置同步',
+      }[this.lastError] || ('云端拒绝 · 点击重试');
+      SyncStatus.error(why);
     }
     return ok;
   },
@@ -1091,7 +1157,11 @@ const SaveBtn = {
   setSaved()   { this._set('saved',   '✓', '已同步'); },
   setUnsaved() { this._set('unsaved', '↑', '点击上传到云端'); },
   setSaving()  { this._set('saving',  '◎', '上传中…'); },
-  setError()   { this._set('error',   '↻', '同步失败 · 点击重试'); },
+  // 401 时「点击重试」是句假话：重试一万次也不会通，得去设置里换 Token
+  setError(kind) {
+    if (kind === 'auth') this._set('error', '!', 'Token 失效 · 去设置里换');
+    else this._set('error', '↻', '同步失败 · 点击重试');
+  },
 };
 
 // ======================================================================
@@ -2425,13 +2495,31 @@ const App = {
       overlay.classList.remove('show');
       SyncStatus.showConfigured();
       SyncStatus.syncing();
-      // Push current state and re-sync
+      // 先拉后推。本地板子完全可能是空的或停在几周之前 —— 同步坏掉的那两个月里，
+      // 每个人的 localStorage 就是一张各自的孤本。这时直接 push 等于用孤本覆盖云端，
+      // 把同事的任务整片抹掉。所以必须先 merge，再上传合并后的那一份。
+      const remote = await GistSync.pull();
+      if (!GistSync.reachable) {
+        // 读不到 ≠ token 失效，别把「去换 Token」写成提示；这里拦的是覆盖，不是权限
+        SaveBtn.setError('net');
+        SyncStatus.error('读不到云端 · 检查 Gist ID 是否填对');
+        Toast.show('没能读到云端数据，已停止上传（避免覆盖同事的板子）', 6000);
+        return;
+      }
+      GistSync.applyRemote(remote);
       const ok = await GistSync.push(DataModel.state);
       if (ok) {
+        SaveBtn.setSaved();
         SyncStatus.configured();
-        Toast.show('同步配置成功');
+        Toast.show(`同步成功 · 云端 ${DataModel.state.tasks.length} 条任务`, 5000);
       } else {
-        SyncStatus.error('上传失败，请检查 Gist ID 和 Token');
+        // 读得到传不上去 = token 权限不够，不是 Gist ID 错了
+        const why = GistSync.lastError === 'auth'
+          ? 'Token 无写入权限 · 需 Gists: Read and write'
+          : '上传失败 · 点击重试';
+        SaveBtn.setError(GistSync.lastError === 'auth' ? 'auth' : 'net');
+        SyncStatus.error(why);
+        Toast.show(why, 6000);
       }
     });
 
