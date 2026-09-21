@@ -577,16 +577,16 @@ button.chip.rev::after { content: ''; position: absolute; inset: -3px -8px -3px 
 #btn-settings { font-size: 12px; padding: 4px 8px; border-color: transparent; }
 #btn-settings:hover { border-color: var(--blueprint); }
 
-/* ===== Settings Dialog ===== */
-#settings-overlay {
+/* ===== 对话框（同步设置 / 出图设置共用一套） ===== */
+#settings-overlay, #sheet-overlay {
   display: none; position: fixed; inset: 0;
   background: rgba(20, 24, 26, .48);
   backdrop-filter: blur(3px);
   z-index: 10000;
   align-items: center; justify-content: center;
 }
-#settings-overlay.show { display: flex; }
-#settings-dialog {
+#settings-overlay.show, #sheet-overlay.show { display: flex; }
+.dlg {
   background: var(--paper-raised);
   border: 1px solid var(--hair-strong);
   box-shadow: 0 0 0 5px var(--paper-raised), var(--shadow-2);
@@ -594,56 +594,96 @@ button.chip.rev::after { content: ''; position: absolute; inset: -3px -8px -3px 
   width: 430px; max-width: 90vw;
   max-height: 88vh; overflow: auto;
 }
-#settings-dialog h3 {
+.dlg h3 {
   font-family: var(--f-display); font-size: 17px; font-weight: 600;
   margin-bottom: 4px; letter-spacing: .01em;
 }
-#settings-dialog .sub {
+.dlg .sub {
   font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .14em;
   text-transform: uppercase; color: var(--ink-3); margin-bottom: 18px;
   padding-bottom: 12px; border-bottom: 1px solid var(--hair);
 }
-#settings-dialog label {
+.dlg label {
   display: block; font-family: var(--f-mono); font-size: 9.5px; font-weight: 500;
   letter-spacing: .13em; text-transform: uppercase;
   color: var(--ink-3); margin-bottom: 5px; margin-top: 15px;
 }
-#settings-dialog label:first-of-type { margin-top: 0; }
-#settings-dialog input {
+.dlg label:first-of-type { margin-top: 0; }
+.dlg input {
   width: 100%; padding: 8px 10px; border: 1px solid var(--hair-strong);
   border-radius: 0; font-family: var(--f-mono); font-size: 12.5px;
   background: var(--paper); color: var(--ink);
 }
-#settings-dialog input:focus { outline: none; border-color: var(--blueprint); box-shadow: 0 0 0 2px var(--blueprint-soft); }
-#settings-dialog .hint {
+.dlg input:focus { outline: none; border-color: var(--blueprint); box-shadow: 0 0 0 2px var(--blueprint-soft); }
+.dlg .hint {
   font-size: 11px; color: var(--ink-3); margin-top: 5px; line-height: 1.5;
 }
-#settings-dialog .hint a { color: var(--blueprint); }
-#settings-dialog .btn-row {
+.dlg .hint a { color: var(--blueprint); }
+.dlg .btn-row {
   display: flex; gap: 8px; justify-content: flex-end;
   margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--hair);
 }
-#settings-dialog button {
+.dlg button {
   font-family: var(--f-mono); font-size: 11px; letter-spacing: .05em;
   padding: 7px 15px; border-radius: 0; cursor: pointer;
   border: 1px solid var(--hair-strong); background: transparent; color: var(--ink-2);
   transition: all .16s var(--ease);
 }
-#settings-dialog button:hover { border-color: var(--blueprint); color: var(--blueprint); background: var(--blueprint-soft); }
-#settings-dialog button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-#settings-dialog button.primary:hover { background: var(--blueprint); border-color: var(--blueprint); color: var(--paper-raised); }
-#settings-dialog button.danger { color: var(--rust); border-color: transparent; background: transparent; margin-right: auto; }
-#settings-dialog button.danger:hover { background: var(--rust); color: var(--paper-raised); border-color: var(--rust); }
-#settings-dialog .dlg-rule {
+.dlg button:hover { border-color: var(--blueprint); color: var(--blueprint); background: var(--blueprint-soft); }
+.dlg button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.dlg button.primary:hover { background: var(--blueprint); border-color: var(--blueprint); color: var(--paper-raised); }
+.dlg button.danger { color: var(--rust); border-color: transparent; background: transparent; margin-right: auto; }
+.dlg button.danger:hover { background: var(--rust); color: var(--paper-raised); border-color: var(--rust); }
+.dlg .dlg-rule {
   display: flex; align-items: center; gap: 9px; margin-top: 21px;
   font-family: var(--f-mono); font-size: 9px; font-weight: 500;
   letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
 }
-#settings-dialog .dlg-rule::after { content: ""; flex: 1; border-top: 1px solid var(--hair); }
-#settings-dialog .btn-row.backup {
+.dlg .dlg-rule::after { content: ""; flex: 1; border-top: 1px solid var(--hair); }
+.dlg .btn-row.backup {
   justify-content: flex-start; margin-top: 11px; padding-top: 0; border-top: none;
 }
 #import-file { display: none; }
+
+/* ===== 出图对话框特有的几件控件 ===== */
+.dlg.wide { width: 468px; }
+.dlg select {
+  width: 100%; padding: 7px 9px; border: 1px solid var(--hair-strong);
+  border-radius: 0; font-family: var(--f-mono); font-size: 12.5px;
+  background: var(--paper); color: var(--ink);
+  /* 原生下拉箭头在纸面上太抢戏，换成一根细引线 */
+  appearance: none; -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+                    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 51%, calc(100% - 10px) 51%;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+}
+.dlg select:focus { outline: none; border-color: var(--blueprint); box-shadow: 0 0 0 2px var(--blueprint-soft); }
+.dlg .sh-row { display: flex; gap: 12px; }
+.dlg .sh-row > div { flex: 1; min-width: 0; }
+/* 分段控件：一档一个，选中即整块压黑，和筛选按钮同一套语言 */
+.seg { display: flex; border: 1px solid var(--hair-strong); }
+.seg button {
+  flex: 1; padding: 7px 4px; border: none; border-right: 1px solid var(--hair);
+  background: transparent; color: var(--ink-2); cursor: pointer;
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .04em;
+  transition: background .16s var(--ease), color .16s var(--ease);
+}
+.seg button:last-child { border-right: none; }
+.seg button:hover { background: var(--blueprint-soft); color: var(--blueprint); }
+.seg button.on { background: var(--ink); color: var(--paper-raised); }
+.seg button.on:hover { background: var(--blueprint); color: var(--paper-raised); }
+.sh-opt {
+  display: flex; align-items: flex-start; gap: 8px; margin-top: 16px;
+  font-size: 11.5px; line-height: 1.5; color: var(--ink-2); cursor: pointer;
+}
+.sh-opt input { width: auto; margin: 1px 0 0; accent-color: var(--blueprint); }
+#sh-summary {
+  margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--hair);
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .05em;
+  color: var(--ink-2); line-height: 1.7;
+}
+#sh-summary.is-capped { color: var(--rust); }
 
 /* ===== 键盘焦点 —— 图纸上的选择集 ===== */
 /* 只给 :focus-visible，鼠标点按钮不会留框；输入框自己有下划线/光环，不重复描边 */
@@ -651,7 +691,7 @@ button.chip.rev::after { content: ''; position: absolute; inset: -3px -8px -3px 
 button:focus-visible { outline-offset: 3px; }
 /* REV 彽标只有 8.5px，标准偏移会撞到我排的邻卡 */
 button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
-#settings-dialog input:focus-visible,
+.dlg input:focus-visible,
 .task-card input:focus-visible,
 .task-card select:focus-visible { outline: none; }
 
@@ -716,7 +756,8 @@ button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
 #toolbar .filter-btn.active:hover { background: var(--blueprint); border-color: var(--blueprint); color: var(--paper-raised); }
 
 /* ===== Stats — 图签栏 ===== */
-#stats-bar {
+/* .stat-bar 是同一根栏在出图纸上的分身：屏幕上是 #stats-bar，纸上是 .stat-bar */
+#stats-bar, .stat-bar {
   display: flex; align-items: stretch; flex-wrap: wrap;
   background: var(--paper-raised);
   border-bottom: 1px solid var(--hair-strong);
@@ -797,59 +838,177 @@ button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
   }
 }
 
-/* ===== Print — 晒图（A3 横排图纸） ===== */
-#title-block { display: none; }
+/* ===== 出图 — 晒图（A3 横排 · 多周连排 / 按人分册） ===== */
 @page { size: A3 landscape; margin: 10mm; }
+#print-stack, #sheet-preview-bar { display: none; }
+
+/* 晒图一律走日览纸面：蓝图是屏幕上的一套灯下图，打印机给不出深蓝底。
+   令牌就地覆盖在堆栈容器上 —— 屏上预览和出纸因此是同一份观感，
+   不会出现「屏幕上深蓝、打出来白纸」的意外。 */
+#print-stack {
+  --paper: #FFFFFF;
+  --paper-raised: #FFFFFF;
+  --paper-sunk: #EDEAE2;
+  --grid: transparent;
+  --grid-bold: transparent;
+  --ink: #1C1A16;
+  --ink-2: #4A463E;
+  --ink-3: #6E6659;
+  --ink-4: #A69C8B;
+  --hair: #D8D2C6;
+  --hair-strong: #B4AA97;
+  --shadow-1: none;
+  --shadow-2: none;
+  --hatch: rgba(76, 107, 78, .05);
+  --spark-hist: #8F8878;
+  --blueprint: #1F5D7C;
+  --blueprint-2: #2C7BA0;
+  --blueprint-soft: rgba(31, 93, 124, .10);
+  --rust: #B0451D;
+  --amber: #8A6310;
+  --sage: #4C6B4E;
+  --tint-ink: rgba(28, 26, 22, .04);
+}
+body.sheet-preview #print-stack {
+  display: block; position: fixed; inset: 0; z-index: 9000;
+  overflow: auto; background: var(--paper-sunk); padding: 58px 0 44px;
+}
+body.sheet-preview #toolbar, body.sheet-preview #stats-bar,
+body.sheet-preview #board, body.sheet-preview #save-bar { display: none; }
+
+#sheet-preview-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9001;
+  align-items: center; gap: 12px; padding: 9px 16px;
+  background: var(--paper-raised); border-bottom: 1px solid var(--hair-strong);
+  /* 纸面令牌下也要能点得动：这排按钮继承 .dlg 之外的样式，单独给一份 */
+  font-family: var(--f-mono); font-size: 11px; color: var(--ink-2);
+}
+body.sheet-preview #sheet-preview-bar { display: flex; }
+#sheet-preview-bar .pv-set {
+  font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--ink-3); flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#sheet-preview-bar button {
+  font-family: var(--f-mono); font-size: 11px; letter-spacing: .05em;
+  padding: 6px 13px; border: 1px solid var(--hair-strong); border-radius: 0;
+  background: transparent; color: var(--ink-2); cursor: pointer;
+}
+#sheet-preview-bar button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+#sheet-preview-bar button:hover { border-color: var(--blueprint); color: var(--blueprint); }
+#sheet-preview-bar button.primary:hover { background: var(--blueprint); color: #fff; }
+
+/* 一张纸。A3 可印区 400×277mm，96dpi 下正好 1512×1047 CSS px，
+   所以纸面永远按 1512 宽排版，屏上只做等比缩小 —— 所见即所出，
+   不会出现「屏上两列、纸上三列」这种对不上的预览。
+   --fv（屏上适配窗口宽的缩放）由 JS 写进 #print-stack：CSS calc 除不出
+   无单位的比值（长度除以长度不合法），只能这么绕。打印时 --fit 只认 --fc。 */
+.sheet-paper {
+  --fit: calc(var(--fv, 1) * var(--fc, 1));
+  width: calc(1512px * var(--fit));
+  height: calc(var(--nat, 1047px) * var(--fit));
+  margin: 0 auto 22px;
+  background: var(--paper-raised); color: var(--ink);
+  border: 1px solid var(--hair-strong);
+  box-shadow: 0 2px 4px rgba(28, 26, 22, .06), 0 12px 30px rgba(28, 26, 22, .11);
+}
+.sheet-page {
+  position: relative;
+  width: 1512px; min-height: 1047px;
+  padding: 22px 26px 18px;
+  transform-origin: 0 0; transform: scale(var(--fit));
+}
+/* 压到下限还是装不下 —— 预览里标出来，别等打印机吐出两张才发现 */
+.sheet-paper.is-spill { outline: 1px dashed var(--rust); outline-offset: 3px; }
+.sheet-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 14px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--ink);
+}
+.sh-title { font-family: var(--f-display); font-size: 17px; font-weight: 600; letter-spacing: .01em; }
+.sh-sub {
+  font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3); margin-top: 5px;
+}
+.sh-right { text-align: right; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; color: var(--ink-3); white-space: nowrap; }
+.sh-right b { display: block; font-size: 15px; font-weight: 500; letter-spacing: .02em; color: var(--ink); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.sheet-page .card-del, .sheet-page .column-footer { display: none; }
+.sheet-page .task-card { cursor: default; animation: none; break-inside: avoid; }
+.sheet-page .column { box-shadow: none; }
+.sheet-page .column:hover { box-shadow: none; }
+.sheet-page .column-body { overflow: visible; }
+
+/* 按周连排：四列通栏。屏上看板是 4 列并排，纸上 1512px 宽同样放得下
+   四个 100mm 图框 —— 旧的 2×2 排法是为了迁就屏幕宽度，纸面基准定死后
+   就不必再把两周的高度叠进一张纸里。 */
+.sheet-page .stat-bar { margin-top: 5mm; border-bottom: 1px solid var(--hair-strong); }
+.sheet-board {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5mm 4mm; padding: 5mm 0 0; align-content: start;
+}
+/* 按人成册：一人一张，卡片走报纸分栏自动配平 */
+.sheet-flow { padding: 5mm 0 0; column-count: 3; column-gap: 5mm; }
+.sheet-flow.sparse { column-count: 2; }
+.sheet-flow .task-card { break-inside: avoid; display: block; margin-bottom: 4mm; }
+
+/* 图签栏（每页一条） */
+.tb { display: flex; flex-wrap: wrap; margin-top: 6mm; border: 1px solid var(--ink); }
+.tb-cell {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 5px 12px; border-right: 1px solid var(--hair-strong);
+  min-width: 74px;
+}
+.tb-cell:last-child { border-right: none; }
+.tb-cell.grow { flex: 1; }
+.tb-cell .anno { font-size: 7.5px; letter-spacing: .16em; }
+.tb-val {
+  font-family: var(--f-mono); font-size: 11px; font-weight: 500;
+  color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.tb-val.zh { font-family: var(--f-display); font-weight: 600; font-size: 12.5px; }
+
+/* 目录页 */
+.toc { padding-top: 5mm; }
+.toc table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.toc th {
+  text-align: left; padding: 5px 9px; font-family: var(--f-mono);
+  font-size: 8.5px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); border-bottom: 1px solid var(--hair-strong);
+}
+.toc td {
+  padding: 6px 9px; border-bottom: 1px solid var(--hair);
+  font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink-2);
+}
+.toc td.zh { font-family: var(--f-display); font-size: 12px; color: var(--ink); }
+.toc tbody tr:last-child td { border-bottom: none; }
+.toc td.num { text-align: right; }
+/* 按人成册时卷与卷之间断开：换卷那一行的上边线加重并留一点呼吸 */
+.toc tbody tr.vol-break td { border-top: 1.5px solid var(--ink-3); padding-top: 10px; }
+.toc tbody tr.vol-break:first-child td { border-top: none; }
+.toc-note {
+  margin-top: 6mm; padding-top: 4mm; border-top: 1px dashed var(--hair-strong);
+  font-size: 11.5px; line-height: 1.75; color: var(--ink-2);
+}
 
 @media print {
-  /* 蓝图夜览不进打印机：强制回到纸面 */
-  :root, body[data-theme="blueprint"] {
-    --paper: #FFFFFF;
-    --paper-raised: #FFFFFF;
-    --paper-sunk: #EDEAE2;
-    --grid: transparent;
-    --grid-bold: transparent;
-    --ink: #1C1A16;
-    --ink-2: #4A463E;
-    --ink-3: #6E6659;
-    --hair: #D8D2C6;
-    --hair-strong: #B4AA97;
-    --shadow-1: none;
-    --shadow-2: none;
-    --hatch: rgba(76, 107, 78, .05);
-    --spark-hist: #8F8878;
-  }
-  /* 浏览器默认不打印背景，但剖面线与尺寸线填充是这张图的信息 */
+  /* 剖面线、尺寸线填充是这张图的信息，不能让浏览器默认的背景打印抹掉 */
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   html, body { height: auto; overflow: visible; background: #fff; }
   body { display: block; background-image: none; }
-  #toolbar, #save-bar, #settings-overlay, #toast, .card-del, .column-footer { display: none !important; }
-  #stats-bar { border-bottom: 1px solid var(--hair-strong); }
-  /* 四列挤一行在 A3 上太窄，改成 2×2 图框 */
-  #board {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6mm 5mm; padding: 5mm 0 0; overflow: visible;
+  #toolbar, #save-bar, #settings-overlay, #sheet-overlay, #toast,
+  #stats-bar, #board, #sheet-preview-bar { display: none !important; }
+  #print-stack {
+    display: block !important; position: static; overflow: visible;
+    background: #fff; padding: 0;
   }
-  .column { box-shadow: none; break-inside: auto; }
-  .column-body { overflow: visible; padding: 8px 8px 0; }
-  .task-card { break-inside: avoid; box-shadow: none; animation: none; }
-  #title-block {
-    display: flex; flex-wrap: wrap;
-    margin-top: 6mm; border: 1px solid var(--ink);
+  /* 屏上的纸边、投影与留白是给眼睛的；出纸只保留分页与配平缩放。
+     纸盒尺寸依旧按 --fit 算 —— transform 不改变占位，盒高要跟缩放后的
+     画面对上，否则会「画只占一张纸、盒子占两张纸」平白多吐一张白纸。 */
+  .sheet-paper {
+    --fit: var(--fc, 1);
+    margin: 0; border: none; box-shadow: none; outline: none;
+    break-after: page; page-break-after: always;
   }
-  .tb-cell {
-    display: flex; flex-direction: column; gap: 3px;
-    padding: 5px 12px; border-right: 1px solid var(--hair-strong);
-    min-width: 74px;
-  }
-  .tb-cell:last-child { border-right: none; }
-  .tb-cell.grow { flex: 1; }
-  .tb-cell .anno { font-size: 7.5px; letter-spacing: .16em; }
-  .tb-val {
-    font-family: var(--f-mono); font-size: 11px; font-weight: 500;
-    color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap;
-  }
-  .tb-val.zh { font-family: var(--f-display); font-weight: 600; font-size: 12.5px; }
+  .sheet-paper:last-child { break-after: auto; page-break-after: auto; }
 }
 </style>
 </head>
@@ -867,7 +1026,7 @@ button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
   </div>
   <button type="button" id="btn-today">回到本周</button>
   <button type="button" id="btn-copy-prev">复制上周未完成</button>
-  <button type="button" id="btn-print" title="打印成 A3 图纸">晒图</button>
+  <button type="button" id="btn-print" title="出图：多周连排 / 按人分册 / A3 图纸">晒图</button>
   <span class="sep"></span>
   <input type="text" id="search-input" class="search-input" placeholder="搜索任务 / FIND" />
   <div id="status-filters" class="status-filters">
@@ -885,7 +1044,6 @@ button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
 <div id="toast"></div>
 <div id="stats-bar"></div>
 <div id="board"></div>
-<div id="title-block"></div>
 
 <div id="save-bar">
   <button type="button" id="btn-save" class="saved">
@@ -895,7 +1053,7 @@ button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
 </div>
 
 <div id="settings-overlay">
-  <div id="settings-dialog">
+  <div class="dlg" id="settings-dialog">
     <h3>同步设置</h3>
     <p class="sub">Cloud Sync · GitHub Gist</p>
     <label>Gist ID</label>
@@ -918,6 +1076,52 @@ button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
     </div>
   </div>
 </div>
+
+<div id="sheet-overlay">
+  <div class="dlg wide" id="sheet-dialog">
+    <h3>晒图设置</h3>
+    <p class="sub">Sheet Set · A3 横排 · 自动配平</p>
+    <div class="sh-row">
+      <div>
+        <label>截止周</label>
+        <select id="sh-from"></select>
+      </div>
+      <div>
+        <label>连排周数</label>
+        <select id="sh-count"></select>
+      </div>
+    </div>
+    <label>分册方式</label>
+    <div class="seg" id="sh-mode">
+      <button type="button" data-v="weeks" class="on">按周连排</button>
+      <button type="button" data-v="persons">按人成册</button>
+    </div>
+    <label>收录范围</label>
+    <div class="seg" id="sh-scope">
+      <button type="button" data-v="all" class="on">全部任务</button>
+      <button type="button" data-v="open">只出未完成</button>
+      <button type="button" data-v="filtered">沿用当前筛选</button>
+    </div>
+    <label class="sh-opt">
+      <input type="checkbox" id="sh-toc" checked>
+      <span>首页加图纸目录（多于一张时才有意义）</span>
+    </label>
+    <p id="sh-summary"></p>
+    <div class="btn-row">
+      <button type="button" id="btn-cancel-sheet">取消</button>
+      <button type="button" id="btn-sheet-preview">预览</button>
+      <button type="button" class="primary" id="btn-sheet-print">晒图</button>
+    </div>
+  </div>
+</div>
+
+<div id="sheet-preview-bar">
+  <button type="button" id="btn-pv-close">‹ 回到看板</button>
+  <span class="pv-set" id="pv-set"></span>
+  <button type="button" id="btn-pv-reopen">改设置</button>
+  <button type="button" class="primary" id="btn-pv-print">晒图</button>
+</div>
+<div id="print-stack"></div>
 
 <script>
 // ======================================================================
@@ -1660,27 +1864,6 @@ const Renderer = {
     this.renderToolbar(weekStr);
     this.renderStats(weekStr);
     this.renderBoard(weekStr);
-    this.renderTitleBlock(weekStr);
-  },
-
-  // 图签栏：只在晒图时出现
-  renderTitleBlock(weekStr) {
-    const p = WeekUtils.parseWeekStr(weekStr);
-    const pad = n => String(n).padStart(2, '0');
-    const now = new Date();
-    const cells = [
-      { k: '部门', v: '效果图部门', zh: 1 },
-      { k: '图名', v: p ? `${p.year}年第${p.week}周 任务进度表` : '任务进度表', zh: 1, grow: 1 },
-      { k: '周期', v: WeekUtils.formatDimRange(weekStr) },
-      { k: '图号', v: 'WTP-' + weekStr },
-      { k: '签发', v: `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}` },
-      { k: '比例', v: 'NTS' },
-      { k: '版次', v: 'R1' },
-      { k: '制图', v: C.MEMBERS.join(' · '), zh: 1 },
-    ];
-    document.getElementById('title-block').innerHTML = cells.map(c =>
-      `<div class="tb-cell${c.grow ? ' grow' : ''}"><span class="anno">${c.k}</span>` +
-      `<span class="tb-val${c.zh ? ' zh' : ''}">${esc(c.v)}</span></div>`).join('');
   },
 
   renderToolbar(weekStr) {
@@ -1772,15 +1955,19 @@ const Renderer = {
     }).join('') + `</span>`;
   },
 
-  _renderColumn(person, tasks, load, delta) {
+  // opts 只服务出图：divLabel 换掉列头那枚子图幅号，idSuffix 让同一页里的
+  // column-* / col-body-* 不跟看板或别的页撞名（一张纸上是四个人的列）。
+  _renderColumn(person, tasks, load, delta, opts) {
+    const o = opts || {};
     const idx = C.MEMBERS.indexOf(person);
+    const suffix = o.idSuffix || '';
     const done = tasks.filter(t => t.status === '已完成').length;
     const rate = tasks.length > 0 ? Math.round(done / tasks.length * 100) : 0;
 
-    let html = `<div class="column" id="column-${idx}">`;
+    let html = `<div class="column" id="column-${idx}${suffix}">`;
     html += `<div class="column-header">
       <div class="ph-left">
-        <span class="sht">SHT ${String(idx + 1).padStart(2, '0')}</span>
+        <span class="sht">${esc(o.divLabel || 'SHT ' + String(idx + 1).padStart(2, '0'))}</span>
         <span class="person-name"><span class="dot ${C.DOT_CLASSES[idx]}"></span>${esc(person)}</span>
       </div>
       <div class="ph-right">
@@ -1790,7 +1977,7 @@ const Renderer = {
       </div>
     </div>`;
 
-    html += `<div class="column-body${tasks.length === 0 ? ' empty' : ''}" id="col-body-${idx}">`;
+    html += `<div class="column-body${tasks.length === 0 ? ' empty' : ''}" id="col-body-${idx}${suffix}">`;
     tasks.forEach((task, n) => { html += this._renderCard(task, n, delta.get(DataModel.weekKey(task))); });
     html += `</div>`;
 
@@ -1950,8 +2137,487 @@ const Renderer = {
 };
 
 // ======================================================================
+// SheetSet — 出图：多周连排 / 按人分册 / 图纸目录
+// 一张纸 = 一个 .sheet-page，全部先铺进 #print-stack，打印时只露这个容器。
+// 卡片与分栏的 markup 一律复用 Renderer 的私有渲染函数，出图与看板同源，
+// 否则「屏上好看、纸上走样」会一直修不完。
+// ======================================================================
+const SheetSet = {
+  MAX_COUNT: 8,
+  // 按人成册时页数 = 周数 × 人数，给个上限免得一次打出一本书
+  MAX_PAGES: 16,
+  CODE: 'WTP',
+  cfg: null,
+
+  defaultCfg() {
+    return { from: DataModel.state.currentWeek, count: 1, mode: 'weeks', scope: 'all', toc: true };
+  },
+
+  // 截止周的下拉：有数据的周 + 本周往前 7 周（空周也要能选，连排时它是「本周没排」的证据）
+  weekOptions() {
+    const set = new Set(DataModel.state.tasks.map(t => t.week));
+    const now = DataModel.state.currentWeek;
+    set.add(now);
+    for (let i = 1; i < this.MAX_COUNT; i++) set.add(WeekUtils.addWeeks(now, -i));
+    return Array.from(set)
+      .filter(w => WeekUtils.parseWeekStr(w))
+      .sort()
+      .reverse();
+  },
+
+  // 从 from 往回数 count 周，旧→新排列：读图顺序就是进度推进方向
+  weeks(cfg) {
+    const list = [];
+    for (let i = cfg.count - 1; i >= 0; i--) list.push(WeekUtils.addWeeks(cfg.from, -i));
+    return list;
+  },
+
+  // 收录范围：全部 / 只出未完成 / 沿用看板当前筛选
+  tasksFor(week, person, cfg) {
+    let tasks = DataModel.getTasksByPerson(week, person);
+    if (cfg.scope === 'open') tasks = tasks.filter(t => t.status !== '已完成');
+    else if (cfg.scope === 'filtered') tasks = FilterState.apply(tasks);
+    return tasks;
+  },
+
+  // 请求周数 → 实际周数（受 MAX_PAGES 约束）。上限之内返回 capped=false。
+  clampCount(want, mode) {
+    const perWeek = mode === 'persons' ? C.MEMBERS.length : 1;
+    const room = Math.max(1, Math.floor((this.MAX_PAGES - 1) / perWeek));
+    const n = Math.max(1, Math.min(this.MAX_COUNT, want, room));
+    return { count: n, capped: n < want };
+  },
+
+  // 排纸：按周连排保留每个请求周（空周也是「本周没排」的证据）；
+  // 按人成册则跳过那人那周的空页，不出一张白纸。
+  plan(cfg) {
+    const weeks = this.weeks(cfg);
+    const sheets = [];
+    if (cfg.mode === 'weeks') {
+      weeks.forEach(w => sheets.push({ kind: 'week', week: w }));
+    } else {
+      // 按人成册：一个人先把几周排完再换下一个人 —— 装订时是一卷一卷的，
+      // 目录读下来是「易榆乔 W37 → W38」而不是四个人交错。空的那人那周不出白纸。
+      C.MEMBERS.forEach(p => {
+        weeks.forEach(w => {
+          const tasks = this.tasksFor(w, p, cfg);
+          if (!tasks.length) return;
+          sheets.push({ kind: 'person', week: w, person: p, tasks });
+        });
+      });
+    }
+    const withToc = !!cfg.toc && sheets.length > 1;
+    sheets.forEach((s, i) => { s.no = i + 1; });
+    return {
+      cfg, weeks, sheets, withToc,
+      total: sheets.length + (withToc ? 1 : 0),
+      first: weeks[0], last: weeks[weeks.length - 1],
+    };
+  },
+
+  setCode(week) { return this.CODE + '-' + week; },
+
+  // 整套图的图册号：单周不写区间，多周写成 W36–W39
+  suiteCode(plan) {
+    if (plan.first === plan.last) return this.CODE + '-' + plan.first;
+    const p = w => WeekUtils.parseWeekStr(w);
+    const a = p(plan.first), b = p(plan.last);
+    const prefix = this.CODE + '-' + a.year + '-W';
+    return a.year === b.year
+      ? prefix + a.week + '–' + b.week
+      : prefix + a.week + ' – ' + this.CODE + '-' + plan.last;
+  },
+
+  weekLabel(weekStr) {
+    const p = WeekUtils.parseWeekStr(weekStr);
+    return p ? `${p.year}年第${p.week}周` : weekStr;
+  },
+
+  // 纸面「周期」格：单周写本周（周一 — 周日），多周写整册的头尾（09.07 — 10.04）
+  suiteRange(plan) {
+    const p = n => String(n).padStart(2, '0');
+    const f = d => p(d.getMonth() + 1) + '.' + p(d.getDate());
+    if (plan.weeks.length <= 1) return WeekUtils.formatDimRange(plan.first);
+    return f(WeekUtils.getWeekDateRange(plan.first).start) + ' — ' + f(WeekUtils.getWeekDateRange(plan.last).end);
+  },
+
+  // ---- 纸面零件 ----------------------------------------------------
+
+  _tbCells(plan, sheet) {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const cells = [
+      { k: '部门', v: '效果图部门', zh: 1 },
+      { k: '图名', v: sheet.title, zh: 1, grow: 1 },
+      // 周期一格写这张纸自己的那一周；只有目录页写整册的头尾
+      { k: '周期', v: sheet.period || WeekUtils.formatDimRange(sheet.week) },
+      { k: '图号', v: sheet.code },
+    ];
+    if (sheet.vol) cells.push({ k: '册', v: sheet.vol });
+    cells.push({ k: '张次', v: sheet.toc ? 'INDEX' : `SHT ${pad(sheet.no)}/${pad(plan.total)}` });
+    cells.push({ k: '签发', v: `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}` });
+    cells.push({ k: '比例', v: 'NTS' });
+    cells.push({ k: '版次', v: 'R1' });
+    cells.push({ k: '制图', v: sheet.people, zh: 1 });
+    return `<div class="tb">` + cells.map(c =>
+      `<div class="tb-cell${c.grow ? ' grow' : ''}"><span class="anno">${c.k}</span>` +
+      `<span class="tb-val${c.zh ? ' zh' : ''}">${esc(c.v)}</span></div>`).join('') + `</div>`;
+  },
+
+  _head(sheet, plan) {
+    return `<div class="sheet-head">
+      <div>
+        <div class="sh-title">${esc(sheet.title)}</div>
+        <div class="sh-sub">效果图部门 · 周任务进度表 · ${esc(sheet.code)}${sheet.vol ? ' · ' + esc(sheet.vol) : ''}</div>
+      </div>
+      <div class="sh-right"><span>${esc(suiteRangeLabel(plan))}</span><b>${sheet.toc ? '目录' : `第 ${String(sheet.no).padStart(2, '0')} / ${String(plan.total).padStart(2, '0')} 张`}</b></div>
+    </div>`;
+  },
+
+  // 纸面上的图签统计条：与 #stats-bar 同一套 class，口径换成出图范围
+  _stats(week, onlyPerson, cfg) {
+    const names = onlyPerson ? [onlyPerson] : C.MEMBERS;
+    const groups = names.map(p => ({ p, tasks: this.tasksFor(week, p, cfg) }));
+    let all = [];
+    groups.forEach(g => { all = all.concat(g.tasks); });
+    const total = all.length;
+    const done = all.filter(t => t.status === '已完成').length;
+    const rate = total > 0 ? Math.round(done / total * 100) : 0;
+    const lvl = rate >= 80 ? 'is-good' : rate >= 50 ? 'is-warn' : 'is-bad';
+    let html = `<div class="stat-bar">`;
+    html += `<div class="stat-cell"><span class="anno">任务总数</span><span class="stat-value">${total}</span></div>`;
+    html += `<div class="stat-cell"><span class="anno">已完成</span><span class="stat-value">${done}<em>/${total}</em></span></div>`;
+    html += `<div class="stat-cell wide"><span class="anno">完成率</span><span class="stat-value ${lvl}">${rate}<em>%</em></span><span class="rate-track ${lvl}"><i style="width:${rate}%"></i></span></div>`;
+    groups.forEach(g => {
+      const i = C.MEMBERS.indexOf(g.p);
+      const d = g.tasks.filter(t => t.status === '已完成').length;
+      const r = g.tasks.length ? Math.round(d / g.tasks.length * 100) : 0;
+      html += `<div class="stat-person">
+        <div class="sp-top"><span class="stat-dot ${C.DOT_CLASSES[i]}"></span><span class="sp-name">${esc(g.p)}</span><span class="sp-num"><b>${d}</b>/${g.tasks.length}</span></div>
+        <div class="sp-bar"><i style="width:${r}%"></i></div>
+      </div>`;
+    });
+    html += `<div class="stat-legend"><span class="lg-not">未开始</span><span class="lg-prog">进行中</span><span class="lg-done">已完成</span></div>`;
+    return html + `</div>`;
+  },
+
+  _weekSheet(sheet, plan, cfg) {
+    const load = Renderer._weekLoad(sheet.week);
+    const delta = Renderer._weekDelta(sheet.week);
+    const cols = C.MEMBERS.map((p, i) =>
+      Renderer._renderColumn(p, this.tasksFor(sheet.week, p, cfg), load, delta,
+        { divLabel: `分图 ${String(i + 1).padStart(2, '0')}`, idSuffix: `-s${sheet.no}` })
+    ).join('');
+    // 列头那串负荷迷你格始终按全部任务计数 —— 它是这个人的历史节律，
+    // 不该被「只出未完成」这类出图范围改动含义。
+    const meta = {
+      week: sheet.week, no: sheet.no,
+      title: this.weekLabel(sheet.week) + ' 任务进度表',
+      code: this.setCode(sheet.week),
+      people: C.MEMBERS.join(' · '),
+    };
+    return this._head(meta, plan)
+      + this._stats(sheet.week, null, cfg)
+      + `<div class="sheet-board">${cols}</div>`
+      + this._tbCells(plan, meta);
+  },
+
+  _personSheet(sheet, plan, cfg) {
+    const idx = C.MEMBERS.indexOf(sheet.person) + 1;
+    const vol = `VOL ${String(idx).padStart(2, '0')} · ${sheet.person}`;
+    const title = `${sheet.person} · ${this.weekLabel(sheet.week)} 任务进度表`;
+    const code = `${this.setCode(sheet.week)}-${String(idx).padStart(2, '0')}`;
+    const delta = Renderer._weekDelta(sheet.week);
+    const cards = sheet.tasks.map((t, n) =>
+      Renderer._renderCard(t, n, delta.get(DataModel.weekKey(t)))).join('');
+    const meta = { week: sheet.week, no: sheet.no, title, code, vol, people: sheet.person };
+    return this._head(meta, plan)
+      + this._stats(sheet.week, sheet.person, cfg)
+      + `<div class="sheet-flow${sheet.tasks.length > 5 ? '' : ' sparse'}">${cards}</div>`
+      + this._tbCells(plan, meta);
+  },
+
+  _tocSheet(plan, cfg) {
+    let prevVol = 0;
+    const rows = plan.sheets.map(s => {
+      const tasks = s.kind === 'week'
+        ? C.MEMBERS.reduce((a, p) => a.concat(this.tasksFor(s.week, p, cfg)), [])
+        : s.tasks;
+      const done = tasks.filter(t => t.status === '已完成').length;
+      const rate = tasks.length ? Math.round(done / tasks.length * 100) : 0;
+      const vn = s.kind === 'person' ? C.MEMBERS.indexOf(s.person) + 1 : 0;
+      // 成册时给每卷开头一道加重横线，目录上能看出「这里换了一卷」
+      const brk = cfg.mode === 'persons' && vn !== prevVol;
+      prevVol = vn;
+      const meta = s.kind === 'week'
+        ? { title: this.weekLabel(s.week), code: this.setCode(s.week), vol: '—', people: tasks.length }
+        : { title: `${s.person} · ${this.weekLabel(s.week)}`, code: `${this.setCode(s.week)}-${String(vn).padStart(2, '0')}`, vol: `VOL ${String(vn).padStart(2, '0')}`, people: tasks.length };
+      return `<tr${brk ? ' class="vol-break"' : ''}>
+        <td class="num">${String(s.no).padStart(2, '0')}</td>
+        <td>${esc(meta.code)}</td>
+        <td class="zh">${esc(meta.title)}</td>
+        <td>${esc(WeekUtils.formatDimRange(s.week))}</td>
+        <td>${esc(meta.vol)}</td>
+        <td class="num">${meta.people}</td>
+        <td class="num">${done}</td>
+        <td class="num">${rate}%</td>
+      </tr>`;
+    }).join('');
+    let all = [];
+    plan.sheets.forEach(s => {
+      all = all.concat(s.kind === 'week'
+        ? C.MEMBERS.reduce((a, p) => a.concat(this.tasksFor(s.week, p, cfg)), [])
+        : s.tasks);
+    });
+    // 一张任务只属于一个人 + 一周，各页之间天然不重不漏，直接计数
+    const total = all.length;
+    const done = all.filter(t => t.status === '已完成').length;
+    const scope = { all: '全部任务', open: '只出未完成', filtered: '沿用看板当前筛选' }[cfg.scope];
+    const order = cfg.mode === 'persons'
+      ? '按人成册，每人一卷（VOL），卷内按周从旧到新；当周没有排任务的人不出空卷。'
+      : '按周连排，一人一张分图（四人四张），排空的周也保留一张，作为「本周没排」的证据。';
+    const note = `<div class="toc-note">本册 ${plan.weeks.length} 周（${esc(this.weekLabel(plan.first))} 至 ${esc(this.weekLabel(plan.last))}），`
+      + `共 ${plan.total} 张 A3 横排，收录范围：${esc(scope)}。${esc(order)}<br>`
+      + `合计 ${total} 项、已完成 ${done} 项；同一条任务在相邻两周各记一次，按周分别计数。<br>`
+      + `数据截至 ${esc(new Date().toLocaleString('zh-CN', { hour12: false }))}，来源为云端 Gist 与本机缓存合并后的结果。</div>`;
+    const meta = {
+      week: plan.last, no: 0, toc: true, period: this.suiteRange(plan),
+      title: '图纸目录 · Drawing Index',
+      code: this.suiteCode(plan),
+      people: C.MEMBERS.join(' · '),
+    };
+    return this._head(meta, plan)
+      + `<div class="toc"><table>
+          <thead><tr><th class="num">张次</th><th>图号</th><th>图名</th><th>周期</th><th>册</th><th class="num">任务</th><th class="num">完成</th><th class="num">率</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>${note}</div>`
+      + this._tbCells(plan, Object.assign({}, meta, { title: '周任务进度表 · 图纸目录' }));
+  },
+
+  // ---- 铺纸 / 预览 / 出纸 -------------------------------------------
+
+  build(cfg) {
+    this.cfg = Object.assign(this.defaultCfg(), cfg || this.cfg || {});
+    const clamped = this.clampCount(this.cfg.count, this.cfg.mode);
+    this.capped = clamped.capped;
+    // 被上限压掉的是「这次排纸用几周」，不是「用户要几周」：this.cfg 保持原值，
+    // 否则重开对话框时周数下拉会自己变成压完的 3，用户看着像被吞了一次输入。
+    const plan = this.plan(Object.assign({}, this.cfg, { count: clamped.count }));
+    this.lastPlan = plan;
+    // 纸（.sheet-paper，屏上带边带影、纸上只管分页）包着画布（.sheet-page，
+    // 固定 1512×1047 = A3 可印区），配平缩放发生在画布这一层。
+    const page = s => `<div class="sheet-paper"><div class="sheet-page">${s}</div></div>`;
+    const html = [];
+    if (plan.withToc) html.push(page(this._tocSheet(plan, this.cfg)));
+    plan.sheets.forEach(s => {
+      html.push(page(s.kind === 'week'
+        ? this._weekSheet(s, plan, this.cfg)
+        : this._personSheet(s, plan, this.cfg)));
+    });
+    document.getElementById('print-stack').innerHTML = html.join('');
+    this.fit();
+    return plan;
+  },
+
+  // 配平：纸面按 1512 宽排版后量自然高度，缩到装得进 A3 短边。
+  // transform 不改变盒子占位，所以纸的占位高度要自己写回 --nat，否则纸叠纸。
+  // 压到 FIT_FLOOR 就不再压 —— 宁可让它续一张纸，也不印出读不得的小字。
+  A3_H: 1047,
+  FIT_FLOOR: .66,
+  fit() {
+    const H = this.A3_H;
+    let worst = 1, spill = 0;
+    document.querySelectorAll('#print-stack .sheet-paper').forEach(paper => {
+      const page = paper.querySelector('.sheet-page');
+      const h = page.scrollHeight;
+      const fc = h > H ? Math.max(this.FIT_FLOOR, H / h) : 1;
+      paper.style.setProperty('--fc', fc.toFixed(4));
+      paper.style.setProperty('--nat', Math.max(H, h) + 'px');
+      paper.classList.toggle('is-spill', h * fc > H + 1);
+      worst = Math.min(worst, fc);
+      if (h * fc > H + 1) spill++;
+    });
+    this.minFit = worst;
+    this.spillPages = spill;
+    return { worst, spill };
+  },
+
+  // 屏上适配：整叠纸按窗口宽等比缩小。这个值只影响预览，不参与出纸
+  // （@media print 里的 --fit 只认 --fc），所以 1512 基准与纸面一一对应。
+  viewFit() {
+    const w = Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth);
+    const fv = Math.max(.2, Math.min(1, (w - 44) / 1512));
+    document.getElementById('print-stack').style.setProperty('--fv', fv.toFixed(4));
+    return fv;
+  },
+
+  preview(cfg) {
+    const plan = this.build(cfg);
+    document.body.classList.add('sheet-preview');
+    this.viewFit();
+    document.getElementById('pv-set').textContent = this.summaryText(plan, false);
+    // 思源宋体是后到的，字一换行高就变；字体落地后重新配平一次
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        this.fit();
+        document.getElementById('pv-set').textContent = this.summaryText(plan, false);
+      });
+    }
+    return plan;
+  },
+
+  close() {
+    document.body.classList.remove('sheet-preview');
+  },
+
+  // 「晒图」= 直接出纸。标题临时换成图册号，另存为 PDF 时文件名就是图号。
+  printNow() {
+    const plan = this.build();
+    const keep = document.title;
+    document.title = plan.sheets.length > 1 ? this.suiteCode(plan) : (plan.sheets[0] ? this.setCode(plan.sheets[0].week) : keep);
+    document.getElementById('pv-set').textContent = this.summaryText(plan, false);
+    window.print();
+    setTimeout(() => { document.title = keep; }, 400);
+    return plan;
+  },
+
+  summaryText(plan, withRange) {
+    const cfg = plan.cfg;
+    const bits = [`${plan.total} 张`, 'A3 横排', this.suiteCode(plan)];
+    if (cfg.mode === 'persons') bits.push('按人成册');
+    if (cfg.scope === 'open') bits.push('只出未完成');
+    if (cfg.scope === 'filtered') bits.push('沿用当前筛选');
+    if (this.capped) bits.push(`周数已压到 ${cfg.count}（上限 ${this.MAX_PAGES} 张）`);
+    if (this.minFit != null && this.minFit < .999) bits.push(`配平 ${Math.round(this.minFit * 100)}%`);
+    if (this.spillPages) bits.push(`${this.spillPages} 张压到下限仍超纸面 · 出纸会续页`);
+    return bits.join(' · ');
+  },
+
+  // ---- 对话框 -------------------------------------------------------
+
+  openDialog() {
+    if (!this.cfg) this.cfg = this.defaultCfg();
+    const opts = this.weekOptions();
+    if (opts.indexOf(this.cfg.from) === -1) this.cfg.from = opts[0];
+    const sel = document.getElementById('sh-from');
+    sel.innerHTML = opts.map(w =>
+      `<option value="${esc(w)}"${w === this.cfg.from ? ' selected' : ''}>${esc(this.weekLabel(w))}${WeekUtils.isCurrentWeek(w) ? ' · 本周' : ''}</option>`).join('');
+    const cnt = document.getElementById('sh-count');
+    cnt.innerHTML = '';
+    for (let i = 1; i <= this.MAX_COUNT; i++) {
+      const o = document.createElement('option');
+      o.value = String(i); o.textContent = i === 1 ? '1 周（单张）' : i + ' 周';
+      if (i === this.cfg.count) o.selected = true;
+      cnt.appendChild(o);
+    }
+    this._paintSeg('sh-mode', this.cfg.mode);
+    this._paintSeg('sh-scope', this.cfg.scope);
+    document.getElementById('sh-toc').checked = !!this.cfg.toc;
+    this.updateSummary();
+    document.getElementById('sheet-overlay').classList.add('show');
+    document.getElementById('sh-from').focus();
+  },
+
+  _paintSeg(id, v) {
+    document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  },
+
+  readForm() {
+    const on = id => { const b = document.querySelector('#' + id + ' button.on'); return b ? b.dataset.v : null; };
+    return {
+      from: document.getElementById('sh-from').value,
+      count: parseInt(document.getElementById('sh-count').value, 10) || 1,
+      mode: on('sh-mode') || 'weeks',
+      scope: on('sh-scope') || 'all',
+      toc: document.getElementById('sh-toc').checked,
+    };
+  },
+
+  // 摘要要按「真会打出来的那个计划」算：先套上限再排纸，
+  // 否则会出现「摘要说 21 张、实际只出 12 张」这种对不上的数字。
+  updateSummary() {
+    const base = Object.assign(this.defaultCfg(), this.readForm());
+    const clamped = this.clampCount(base.count, base.mode);
+    base.count = clamped.count;
+    this.capped = clamped.capped;
+    const plan = this.plan(base);
+    const el = document.getElementById('sh-summary');
+    // 缩减提示只说一次：summaryText 里那句对预览条同样适用，这里靠颜色标出来
+    el.innerHTML = this.summaryText(plan, true);
+    el.classList.toggle('is-capped', !!this.capped);
+  },
+
+  bind() {
+    const overlay = document.getElementById('sheet-overlay');
+    const hide = () => overlay.classList.remove('show');
+    const el = id => document.getElementById(id);
+
+    // 分段控件：一档一改，改完立刻重算摘要（周数被上限压掉要当场看得见）
+    document.querySelectorAll('#sh-mode button, #sh-scope button').forEach(b => {
+      b.addEventListener('click', () => {
+        const key = b.closest('.seg').id === 'sh-mode' ? 'mode' : 'scope';
+        this.cfg = Object.assign(this.cfg || this.defaultCfg(), { [key]: b.dataset.v });
+        this._paintSeg('sh-mode', this.cfg.mode);
+        this._paintSeg('sh-scope', this.cfg.scope);
+        this.updateSummary();
+      });
+    });
+    ['sh-from', 'sh-count', 'sh-toc'].forEach(id => {
+      el(id).addEventListener('change', () => {
+        this.cfg = Object.assign(this.cfg || this.defaultCfg(), this.readForm());
+        this.updateSummary();
+      });
+    });
+
+    el('btn-cancel-sheet').addEventListener('click', hide);
+    el('btn-sheet-preview').addEventListener('click', () => {
+      this.cfg = this.readForm(); hide(); this.preview();
+    });
+    el('btn-sheet-print').addEventListener('click', () => {
+      this.cfg = this.readForm(); hide(); this.printNow();
+    });
+    overlay.addEventListener('click', e => { if (e.target === overlay) hide(); });
+
+    el('btn-pv-close').addEventListener('click', () => this.close());
+    el('btn-pv-reopen').addEventListener('click', () => this.openDialog());
+    el('btn-pv-print').addEventListener('click', () => this.printNow());
+
+    // 有人直接按 Cmd+P 绕过晒图按钮：堆栈还没铺就先铺一张本周，
+    // 别让打印机出一叠白纸。
+    window.addEventListener('beforeprint', () => {
+      if (!document.getElementById('print-stack').children.length) this.build();
+      else this.fit();
+    });
+    window.addEventListener('resize', () => {
+      if (document.body.classList.contains('sheet-preview')) this.viewFit();
+    });
+  },
+
+  // ---- 离线 harness：?sheet&from=2026-W36&count=4&mode=persons ------
+  fromUrl() {
+    const q = new URLSearchParams(location.search);
+    if (location.search.indexOf('sheet') === -1) return null;
+    const cfg = this.defaultCfg();
+    if (q.get('from')) cfg.from = q.get('from');
+    if (q.get('count')) cfg.count = Math.min(this.MAX_COUNT, parseInt(q.get('count'), 10) || 1);
+    if (q.get('mode')) cfg.mode = q.get('mode') === 'persons' ? 'persons' : 'weeks';
+    if (q.get('scope')) cfg.scope = ['all', 'open', 'filtered'].indexOf(q.get('scope')) >= 0 ? q.get('scope') : 'all';
+    if (q.get('toc')) cfg.toc = q.get('toc') !== '0';
+    return cfg;
+  },
+};
+
+// 页眉右侧那行小字：单周只写周，多周写区间
+function suiteRangeLabel(plan) {
+  if (plan.weeks.length <= 1) return 'WEEKLY SHEET';
+  const a = WeekUtils.parseWeekStr(plan.first), b = WeekUtils.parseWeekStr(plan.last);
+  return `SUITE ${a.year} W${a.week}–W${b.week}`;
+}
+
+// ======================================================================
 // Editor — Card inline editing
 // ======================================================================
+
 const Editor = {
   currentCard: null,
   currentField: null,
@@ -2447,6 +3113,7 @@ const App = {
     this.bindSettings();
     this.bindGlobalKeys();
     this.bindSaveBtn();
+    SheetSet.bind();
     GistSync.flushOnHide();
     this.bindTheme();
     Renderer.renderAll(DataModel.state.currentWeek);
@@ -2458,6 +3125,9 @@ const App = {
       DataModel.init(merged);
       Renderer.renderAll(DataModel.state.currentWeek);
     }
+    // 离线 harness：?sheet&count=4&mode=persons 直接把纸铺开，不用手点对话框
+    const urlCfg = SheetSet.fromUrl();
+    if (urlCfg) SheetSet.preview(urlCfg);
   },
 
   initTheme() {
@@ -2489,7 +3159,7 @@ const App = {
     document.getElementById('btn-next-week').addEventListener('click', () => Actions.nextWeek());
     document.getElementById('btn-today').addEventListener('click', () => Actions.goToToday());
     document.getElementById('btn-copy-prev').addEventListener('click', () => Actions.copyFromPrev());
-    document.getElementById('btn-print').addEventListener('click', () => window.print());
+    document.getElementById('btn-print').addEventListener('click', () => SheetSet.openDialog());
 
     // Search
     const searchInput = document.getElementById('search-input');
@@ -2669,6 +3339,10 @@ const App = {
       if (e.key === 'Escape') {
         if (Editor.currentField) {
           Editor.cancelEdit();
+        } else if (document.getElementById('sheet-overlay').classList.contains('show')) {
+          document.getElementById('sheet-overlay').classList.remove('show');
+        } else if (document.body.classList.contains('sheet-preview')) {
+          SheetSet.close();
         } else {
           document.getElementById('settings-overlay').classList.remove('show');
         }
