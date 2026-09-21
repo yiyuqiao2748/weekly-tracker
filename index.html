@@ -909,7 +909,9 @@ button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
 const C = {
   STORAGE_KEY: 'renderDeptWeeklyTracker',
   THEME_KEY: 'renderTrackerTheme',
-  SCHEMA_VERSION: 2,
+  SCHEMA_VERSION: 3,
+  // 备份文件/云端数据能被读进来的历史版本（v2 没有 tombstones，读时补上）
+  READABLE_VERSIONS: [1, 2, 3],
   MEMBERS: ['易榆乔', '杨威', '易灿', '刘新金'],
   DOT_CLASSES: ['dot-c0','dot-c1','dot-c2','dot-c3'],
   PRIORITIES: ['高', '中', '低'],
@@ -1073,6 +1075,8 @@ const GistSync = {
 
   // Merge remote into local: tasks from either side kept, deduped by id.
   // Remote wins on conflict (same id, newer updatedAt).
+  // 删除靠墓碑传播：两边 tombstones 取并集，「删得比最后一次修改晚」的那一方说话算数。
+  // 之后要是有人把它改新了（撤销删除、重建），墓碑自动作废 —— 不然删过一次就再也还不回来了。
   // 远端没有新内容时原样返回 localState，便于调用方按引用判断是否有变化。
   merge(localState, remoteState) {
     if (!remoteState || !Array.isArray(remoteState.tasks)) return localState;
@@ -1087,10 +1091,19 @@ const GistSync = {
         taskMap.set(t.id, t); changed = true;
       }
     });
+    const tombs = Object.assign({}, remoteState.tombstones, localState.tombstones);
+    Object.keys(tombs).forEach(id => {
+      const t = taskMap.get(id);
+      if (!t) return;                       // 任务已经不在了，墓碑继续留着往外传
+      if (tombs[id] >= (t.updatedAt || t.createdAt || '')) { taskMap.delete(id); changed = true; }
+      else { delete tombs[id]; changed = true; }
+    });
     if (!changed) return localState;
     return {
       ...localState,
+      schemaVersion: C.SCHEMA_VERSION,
       tasks: Array.from(taskMap.values()),
+      tombstones: tombs,
       currentWeek: localState.currentWeek || remoteState.currentWeek,
     };
   },
@@ -1304,11 +1317,25 @@ const Storage = {
       const state = JSON.parse(raw);
       if (!state) return this.getDefault();
       if (state.schemaVersion === 1) return this.migrateV1toV2(state);
+      if (state.schemaVersion === 2) return this.migrateV2toV3(state);
       if (state.schemaVersion !== C.SCHEMA_VERSION) return this.getDefault();
       return state;
     } catch (e) {
       return this.getDefault();
     }
+  },
+
+  // 备份导入 / 云端数据都要走这一步，别在多处各写一遍版本判断
+  upgrade(state) {
+    if (!state || typeof state !== 'object') return state;
+    if (state.schemaVersion === 1) return this.migrateV1toV2(state);
+    if (state.schemaVersion === 2) return this.migrateV2toV3(state);
+    return state;
+  },
+
+  // v2 → v3：只多了一张删除墓碑表，任务本身一个不动
+  migrateV2toV3(v2) {
+    return { ...v2, schemaVersion: C.SCHEMA_VERSION, tombstones: v2.tombstones || {} };
   },
 
   // Async load: local first, then try remote merge.
@@ -1362,6 +1389,7 @@ const Storage = {
       schemaVersion: C.SCHEMA_VERSION,
       currentWeek: v1.currentWeek || this.getDefault().currentWeek,
       tasks: newTasks,
+      tombstones: {},
     };
   },
 
@@ -1379,6 +1407,7 @@ const Storage = {
       schemaVersion: C.SCHEMA_VERSION,
       currentWeek: WeekUtils.formatWeekStr(now.year, now.week),
       tasks: [],
+      tombstones: {},
     };
   },
 };
@@ -1391,6 +1420,7 @@ const DataModel = {
 
   init(raw) {
     this.state = raw;
+    if (!this.state.tombstones) this.state.tombstones = {};
     this._normalizeOrder();
   },
 
@@ -1518,6 +1548,16 @@ const DataModel = {
   },
 
   _save() { Storage.save(this.state); GistSync.pushDebounced(this.state); },
+
+  // 删除必须留痕：没有墓碑的话，云端那份会把它当成「你这边还没有的新任务」原样还回来。
+  tombstone(ids) {
+    const now = new Date().toISOString();
+    this.state.tombstones = this.state.tombstones || {};
+    ids.forEach(id => { this.state.tombstones[id] = now; });
+  },
+  untombstone(id) {
+    if (this.state.tombstones) delete this.state.tombstones[id];
+  },
 };
 
 // ======================================================================
@@ -1547,7 +1587,7 @@ const Backup = {
   check(data) {
     if (!data || typeof data !== 'object') return '文件内容不是一份备份';
     if (!Array.isArray(data.tasks)) return '缺少 tasks 列表';
-    if (data.schemaVersion !== 1 && data.schemaVersion !== C.SCHEMA_VERSION) {
+    if (C.READABLE_VERSIONS.indexOf(data.schemaVersion) === -1) {
       return `版本 ${data.schemaVersion} 打不开，当前版本 ${C.SCHEMA_VERSION}`;
     }
     if (data.tasks.some(t => !t || typeof t.id !== 'string' || typeof t.week !== 'string')) {
@@ -1556,18 +1596,16 @@ const Backup = {
     return null;
   },
 
-  // 按 id 合并：备份里的覆盖本地同名任务，本地独有的保留，不做删除
+  // 导入 = 一次「远端合并」：走同步那同一套 merge（并集 + updatedAt 新者胜 + 墓碑），
+  // 免得这里再写一份「按 id 无条件覆盖」的逻辑，两处规则迟早打架。
+  // 所以拿旧备份导入不会盖掉本周的新改动；视图也停在当前周，不把人跳走。
   merge(data) {
-    const incoming = data.schemaVersion === 1 ? Storage.migrateV1toV2(data) : data;
-    const byId = new Map(DataModel.state.tasks.map(t => [t.id, t]));
-    let added = 0;
-    incoming.tasks.forEach(t => {
-      if (!byId.has(t.id)) added++;
-      byId.set(t.id, t);
-    });
-    DataModel.state.tasks = [...byId.values()];
+    const incoming = Storage.upgrade(data);
+    const before = new Set(DataModel.state.tasks.map(t => t.id));
+    DataModel.state = GistSync.merge(DataModel.state, incoming);
+    if (!DataModel.state.tombstones) DataModel.state.tombstones = {};
     DataModel._normalizeOrder();
-    DataModel.state.currentWeek = incoming.currentWeek || DataModel.state.currentWeek;
+    const added = DataModel.state.tasks.filter(t => !before.has(t.id)).length;
     return { added, total: incoming.tasks.length };
   },
 };
@@ -2149,6 +2187,7 @@ const Actions = {
     if (idx === -1) return;
     UndoStack.push('删除任务');
     const deleted = DataModel.state.tasks.splice(idx, 1)[0];
+    DataModel.tombstone([deleted.id]);
     DataModel._save();
     Renderer.renderAll(DataModel.state.currentWeek);
     // Toast 上的撤销只把这一条放回去；走 UndoStack.undo 会连带吞掉删除之后的编辑
@@ -2157,6 +2196,9 @@ const Actions = {
 
   undelete(task, idx) {
     if (DataModel.state.tasks.some(t => t.id === task.id)) return;
+    DataModel.untombstone(task.id);   // 墓碑不清掉，下次合并它又被云端抹掉
+    // 墓碑可能已经传上云了：把 updatedAt 顶到删除之后，merge 才会认这次恢复
+    task.updatedAt = new Date().toISOString();
     DataModel.state.tasks.splice(Math.min(idx, DataModel.state.tasks.length), 0, task);
     DataModel._save();
     Renderer.renderAll(DataModel.state.currentWeek, true);
@@ -2179,6 +2221,7 @@ const Actions = {
   uncopy(ids) {
     const set = new Set(ids);
     DataModel.state.tasks = DataModel.state.tasks.filter(t => !set.has(t.id));
+    DataModel.tombstone(ids);   // 复制出去的这几条可能已经上云了
     DataModel._save();
     Renderer.renderAll(DataModel.state.currentWeek, true);
     Toast.show('已撤销复制');
@@ -2194,14 +2237,28 @@ const UndoStack = {
 
   push(label) {
     if (!DataModel.state) return;
-    this.items.push({ label, tasks: JSON.parse(JSON.stringify(DataModel.state.tasks)) });
+    this.items.push({
+      label,
+      tasks: JSON.parse(JSON.stringify(DataModel.state.tasks)),
+      tombstones: JSON.parse(JSON.stringify(DataModel.state.tombstones || {})),
+    });
     if (this.items.length > this.limit) this.items.shift();
   },
 
   undo() {
     const it = this.items.pop();
     if (!it) { Toast.show('没有可撤销的操作'); return false; }
+    const before = new Set(DataModel.state.tasks.map(t => t.id));
+    const after = new Set(it.tasks.map(t => t.id));
+    // 撤销一次「新增」= 连云端也要拿掉，否则下次合并它又回来；
+    // 撤销一次「删除」= 作废墓碑并把 updatedAt 顶到删除之后，光清本地墓碑不够，
+    // 因为那份墓碑可能已经传上云了。
+    const stamp = new Date().toISOString();
+    it.tasks.forEach(t => { if (!before.has(t.id)) t.updatedAt = stamp; });
+    const removed = [...before].filter(id => !after.has(id));
     DataModel.state.tasks = it.tasks;
+    DataModel.state.tombstones = JSON.parse(JSON.stringify(it.tombstones || {}));
+    if (removed.length) DataModel.tombstone(removed);
     DataModel._save();
     Renderer.renderAll(DataModel.state.currentWeek, true);
     Toast.show(`已撤销：${it.label}`);
