@@ -2,18 +2,18 @@
 
 功能清单看 [README.md](./README.md)，这里只记**过程**：为什么做成这样、哪些结论被推翻过、验证要靠什么手段、还剩什么没做。
 
-最后更新：2026-09-21（深夜）。出图重做成图册（多周连排 / 按人成册 / 图纸目录 / 配平）+ 占位页，本轮五份提交已全部 push，Pages 服务内容与本地逐字节一致，占位页那条分支在线上只读复核过。版面留档还没补。
+最后更新：2026-09-21（深夜）。出图重做成图册（多周连排 / 按人成册 / 图纸目录 / 配平）+ 占位页，本轮前五份提交已 push 并按「比内容不比状态码」复核过；**版面留档补上了**（六张出图 + 一份版面读数 JSON），代价是装了一套无头 Chromium，收获是看图当场揪出两条观感缺陷（图签栏浮在纸中间、纸上印着编辑提示）——**这两处修复和留档图目前还在工作区，未提交**。
 
 ## 当前状态
 
 | | |
 | --- | --- |
-| 线上版本 | `9c982bc`（图册版出图 + 占位页 + 这两份文档）。push 后轮询 Pages：前两次（约 45s 内）仍是上一版 `9fb34ddf…` / 167111 字节，第 3 次起 `e891f144f7aaf7f531433969d957ec34` / 170484 字节，**与本地 `index.html` 逐字节一致**；这个比对口径每轮上线后都该做一次，命令见「怎么验证」 |
+| 线上版本 | `b466a50`（= `origin/main`，图册版出图 + 占位页 + 三份文档）。push 后轮询 Pages：前两次（约 45s 内）仍是上一版 `9fb34ddf…` / 167111 字节，第 3 次起 `e891f144f7aaf7f531433969d957ec34` / 170484 字节，与当时本地 `index.html` **逐字节一致**；这个比对口径每轮上线后都该做一次，命令见「怎么验证」。**注意**：本轮留档揪出的两条 CSS 修复让本地变成了 `cbf55842…` / 171477 字节，**线上还差这一步**（未提交） |
 | 数据 schema | v3（带 `tombstones`），可读 v1/v2 并自动升级 |
 | 云端数据 | 69 条任务，覆盖 2026-W21 … W29 |
 | 同步 | 已打通。一次真实 PATCH 验证过非破坏性（69→69，0 条增删，只有 `order` 字段补齐、`currentWeek` W29→W39） |
 | 出图 | 从「单张 A3 + 底部图签」升级为**图册**：按周连排或按人成册，1–8 周，可加图纸目录页，逐张配平缩放，零张纸时出「此页无图」占位页 |
-| 待办 | 新版出图的版面留档一张都没拍（旧那张已标过期）；另外三位同事还没各自配 Token（详见文末「还欠着的」） |
+| 待办 | 版面留档**已补**（六张出图 + `docs/sheet-facts.json`），还缺拖拽中 / 手机长版面 / 出图对话框三张；两条 CSS 修复与留档图**尚未提交**；另外三位同事还没各自配 Token（详见文末「还欠着的」） |
 
 ## 时间线
 
@@ -38,6 +38,8 @@
 | `542a52c` `79b902d` | 2026-09-21 深夜 | 两份文档跟上；`.gitignore` 收掉 `.DS_Store` |
 | `e5eca4e` | 2026-09-21 深夜 | **占位页**：零张纸时出「此页无图 · NIL」，并说清零张的原因（区间没数据 / 收录范围滤空）。线上只读冒烟撞出来的分支，离线 harness 造不出来 |
 | `9c982bc` | 2026-09-21 深夜 | 这两份文档补上图册与占位页的决策、数字、自证方法；连同上一个提交一起 push，并按「比内容不比状态码」复核上线 |
+| `b466a50` | 2026-09-21 21:31 | 只动文档：记下占位页在真站点的只读复核，以及 Pages 缓存翻转的实测秒数（前两次约 45s 仍是旧版） |
+| （未提交） | 2026-09-21 深夜 | **版面留档 + 两条观感修复**：`.preview/shoot.py`（无头 Chromium 出图留档，仓库外）拍六张进 `docs/screenshots/`，版面读数落 `docs/sheet-facts.json`；看图当场揪出「图签栏浮在纸中间」和「纸上印着编辑提示」，`index.html` 只加 12 行 CSS（`flex:1 1 auto` 贴下边线、`.placeholder` 隐藏 + `:has()` 补 `（未命名）`），**配平数字一位没变** |
 
 ## 关键决策与被推翻的假设
 
@@ -95,6 +97,19 @@ v2 的 merge 是「id 取并集 + `updatedAt` 新的赢」，这个语义下**�
 改法不是「让它出张白纸」，是出一张**「此页无图 · No Work To Plot」占位页**：张次 `NIL`，页眉右侧写「占位」，中间一个虚线框说清楚**为什么零张**——区间没数据 / 「只出未完成」把它滤空了 / 看板筛选把它滤空了，三种原因文案不同（别对着一份被筛空的数据说「四个人都排空了」），并给出该拧哪个旋钮。摘要与占位页共用 `nilReason()`，两处说法不会分叉。
 
 顺带一条判断规矩：**空态不是错误态**。零张、零结果、零任务这类状态如果渲染出一片空白，读图的人无法区分「没东西」和「坏了」——这个项目已经因为「✓ 已同步」掩盖静默失败吃过一次两个月的大亏。
+
+### 9. 留档改走无头 Chromium：观感的毛病只有像素能发现
+
+前面八条都是「量出来的」，这条是「看出来的」。占位页和配平结果要留档时，In-app Browser 的面板在后台 → `take_screenshot` 直接 `NATIVE_BROWSER_VIEWPORT_UNAVAILABLE`（`viewport=0x0, visible=false`），而依赖面板前台意味着**每次留档都要用户配合点一下窗口**。于是装了 Playwright + chromium-headless-shell（系统 Python 3.9.6，`pip3 install --user`），留档改由 `.preview/shoot.py` 跑：无头、不需要交互、`--directory .preview` 起服务后一条命令出六张图加 `docs/sheet-facts.json`。
+
+值回票价的是它当场暴露了两条**任何数值断言都测不出来的观感缺陷**：
+
+1. **图签栏浮在纸中间**，下面留一截空白纸。之前所有测量都正常——卡数、自然高、`fc`、`spill` 全对，因为「空白在纸尾」不是布局错误，是观感缺陷——量不出来，看得出来。改法：`.sheet-page` 走 flex 列，内容块 `flex:1 1 auto` 自己吃掉剩余高度，图签栏钉在下边线；图签栏自带的 `margin-top:6mm` 就是最小间距，装不下时也不会糊住最后一张卡。**配平数字一位没变**（1450→.7221、1935→.66），这条要记下来：改的是留白归属，不是容量。
+2. **纸上印着「点击输入任务名称」**。空卡在屏幕上需要提示可编辑，晒出去就成了「谁忘了填」。改成 `.sheet-page .task-name .placeholder{display:none}` + `::after{content:'（未命名）'}`——图纸的写法只陈述这张卡没名字，不教人怎么操作。这里翻过一次车：`::after` 一开始挂在 `.task-name` 上，有名字的卡也被补了一刀，晒出来全是「示例项目 B（未命名）」；必须用 `:has(> .placeholder)` 只挑那张真的挂着占位文案的卡。**同一张卡上的「备注 / NOTES」是故意留着的**：它读作字段名空着，不读作一句给不了的动作指令——只砍带动词的那句，别顺手把所有占位符一起藏掉。
+
+两条修完都用断言钉住（`.preview/verify_sheet.py`，四种排法各跑一遍）：图签栏与纸下边线之间恒等于 page 自己的 18px 下内边距（43 / 22 / 11 / 0 张卡四种密度下都一样，多出来的空白才算浮在纸中间），编辑提示可见数恒 0，`（未命名）` 的卡数与占位卡数恒等（打码种子上分别是 5/43 与 1/22）。
+
+**判断规矩**：`fit()`、`scrollWidth` 这类量能证明版面**没坏**，不能证明它**好看**。这个项目卖的就是图纸观感，留档因此不是收尾的仪式，是第三双眼睛。反过来也成立：**别为了凑一张图去拍一个不存在的状态**——原计划里有一张「蓝图主题下的占位页」，读完 `#print-stack` 那段令牌覆写才知道根本拍不出来（晒图一律走白，见「测量陷阱」第 8 条），于是那张图被删掉，事实改用两个 measured 颜色值记在下面的留档段里。
 
 ## 怎么验证（离线 harness）
 
@@ -172,6 +187,16 @@ http://127.0.0.1:8899/preview.html?sheet&from=2026-W38&count=3&mode=persons
 - 正常路径不变：按人成册两周仍是 9 张（8 卷页 + 目录）、看板 11 张卡、`__net` 0；
 - 顶栏摘要 65 字在一行内不截断（`scrollWidth === clientWidth`）。
 
+留档这一轮顺手把**密度 → 配平**的曲线扫了出来（单张、按周连排、灌合成任务，`fc` 就是 `min(1, 1047 / 自然高)`）：
+
+| 卡数 | 15 | 19 | 21 | 23 | 25 | 29 | 33 | 51 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 自然高 px | 1138 | 1294 | 1450 | 1450 | 1623 | 1779 | 1935 | 2591 |
+| `--fc` | .92 | .81 | **.72** | .72 | .66 | .66 | **.66** | .66 |
+| `is-spill` | 0 | 0 | 0 | 0 | 1 | 1 | **1** | 1 |
+
+三个读数：**约 13 项**开始掉出 100%（真实板上最满的一周是 11 项，所以日常永远配平 100%，这条曲线只能靠合成任务拍到）；**25 项**撞下限 `0.66`；**66% 能吞下的最大自然高是 1586px**（= 1047 ÷ 0.66），超过就是「压不动了，出纸会续页」——留档那两张分别停在曲线的 21 项和 33 项上。
+
 **线上只读冒烟是可以做的**：`https://yiyuqiao2748.github.io/weekly-tracker/` 打开后只发生匿名 GET，`reachable` 闸门保证不会盲推；但**别在真站点上改数据或点「保存并同步」**，要验证上传路径仍然回 `?sync=1`。
 
 push 完在真站点上复核过两件事（全程只读，控制台零条消息）：
@@ -185,40 +210,60 @@ push 完在真站点上复核过两件事（全程只读，控制台零条消息
 2. **主题是从 localStorage 恢复的**。首选项没存过时按系统深浅色决定，所以点 `◐` 是「切换」而不是「设为蓝图」。要测某个主题就直接设 `document.body.dataset.theme` 并**断言令牌取值**（例如 `--paper-raised` 应为 `#132837`），别拿点击当事实。我曾有一轮「日览 + 蓝图各审一遍」其实两遍都在日览下跑的。
 3. **对比度脚本要自己做 alpha 合成**（前景 alpha、逐层向上叠背景），并且跳过 `aria-hidden` 的子树；纯 `min/max` 写法会把所有比值算成 1。
 4. **自动「横向溢出」扫描会被热区伪元素骗到**：`.chip` 的 `scrollWidth > clientWidth` 是那层向外扩的透明 `::after` 计入的，不是排版问题（chip 自然宽 = 盒宽，文字 = 内容盒）。
-5. **拿不到像素时的替代手段够用**：`elementFromPoint` 逐点采样能验命中区域与误抢，`getBoundingClientRect` 能验版面，iframe（同源、给定 390×844）能验窄屏。截图必须面板在前台（`visible=true, attached=true`），而这台机器**只有 Safari、没有 Chrome/Chromium/Edge**，所以没有无头兜底。
+5. **拿不到像素时的替代手段够用**：`elementFromPoint` 逐点采样能验命中区域与误抢，`getBoundingClientRect` 能验版面，iframe（同源、给定 390×844）能验窄屏。In-app Browser 截图必须面板在前台（`visible=true, attached=true`）；后台就直接 `NATIVE_BROWSER_VIEWPORT_UNAVAILABLE`。**2026-09-21 起有兜底了**：Playwright 的 chromium-headless-shell（装在 `~/Library/Caches/ms-playwright/`），见「关键决策」第 9 条。
 6. **`git` 的仓库根是 `weekly-tracker/`**，在上一级跑 `git status` 会报 not a repository；同时 `.preview/`、云端快照 JSON 都在仓库外，属于故意不外传的东西。
 7. **内联 `<script>` 语法错误不会有人告诉你**：表现是 `SheetSet is not defined`、板子空白、`window.__net` undefined，看起来像「模块没加载」而不是「整个脚本没编译」。这台机器**没有 `node` 在 PATH 上**，所以编译检查两条路：改完先在 iframe 里 `eval('typeof SheetSet')` 一眼定生死；要精确定位就用 node-repl 把 `<script>` 段抽出来 `new vm.Script(src)`，错误行号是**相对脚本段**的（`index.html` 的行号 = 段内行号 + `<script>` 所在行 − 1）。这次翻车的原因很典型：往 `return \`<tr>\`…` 这种**跨行模板字符串**里插 `${}` 时把结尾的反引号留下了，字符串就地截断。
+8. **纸面令牌在 `#print-stack` 上就地覆盖，读 `body` 会读到假值**。晒图无视主题：`#print-stack` 自己覆盖了一整套 `--paper*` / `--ink*`（强制白底黑字，打印机给不出深蓝底），所以蓝图主题下 `getComputedStyle(document.body).getPropertyValue('--paper-raised')` 仍是 `#132837`，而纸上那一格实测 `rgb(255,255,255)`。**要量纸面颜色就量 `.sheet-page` 或 `.sheet-card` 自己的 computed style**，别从 `body` 上取令牌再推断——我曾据此报出一个「蓝图出图会变深蓝底」的不存在缺陷。
+9. **`?sheet` 直链页面里没有预览条**，因为它被 print 规则一起复制过来了。harness 把 `@media print` 的整段规则改成 screen 媒体（这是让 `?sheet` 能直接截图的机制），而 `@media print { #sheet-preview-bar { display:none } }` 也在其中，并带 `!important`。所以拍「配平 72%」那类要含预览条的图，**只能走不带 `?sheet` 的路**：`SheetSet.preview(cfg)` 从 JS 里铺纸（`shoot.py` 的 STRESS 那两类就是这么拍的）。同理别用 `#print-stack` 之外的元素判断预览是否生效。
+10. **预览层是自滚动容器，截图的 clip 不能按页面坐标算**。`#print-stack` 是 `position:fixed; inset:0; overflow:auto`：`window.scrollY` **永远是 0**，要拍第 N 张纸必须滚 `#print-stack.scrollTop` 本身，坐标才是视口相对的；`full_page:true` 在这里只会拿到一屏。另外 clip 越界 Chromium 直接报 `Clipped area is either once outside the resulting image`（不是截断，是失败），所以 clip 的 `y+height` 要 `min(…, viewportHeight)` 夹一道，预览条这种 fixed 通栏元素得按**整个视口宽**裁（按纸的 x 裁会把「N 张 · A3 横排」那半句切掉）。
+11. **`/tmp` 下的脚本别用 stdlib 模块名**：那份探针写了 `/tmp/struct.py`，`import` 时把标准库 `struct` 顶掉，报错是别处的 `ImportError`/循环导入，看起来像环境问题。同理 `.preview/` 里的文件名会进 `sys.path[0]`，别起名叫 `types.py` / `json.py`。
 
 ## 版面留档（截图）
 
-`docs/screenshots/` 五张，2026-09-21 19:00 拍，对应 `744ccd2` 的 `index.html`。
+`docs/screenshots/` 十一张，分两批。19:00 那批五张拍的是**看板**（日览 / 蓝图 / 修订表 / 手机 390），仍然有效；其中 `2026-09-21-print-sheet-a3.png` **已过期**（`744ccd2` 的旧 2×2 单张版面），只留着跟新出图图对照。22:00 那批六张是本轮的**图册版出图**。
 
 **图里的项目名是假的。** 板子上跑的是打码种子：`.preview/anonymize_seed.py` 把 `seed.json` 的 `name` / `notes` 换成「示例项目 A…U」「对接人 A…G」（长度尽量与原句相当，免得换行位置变了），真实客户名、分店地名、对接人姓名只存在于云端 Gist 和各自浏览器的 localStorage，不进仓库。备注里的纯工作描述（`第4稿`、`换场地`、`明档修改中`）不含客户信息，原样留着。
+
+**配平那两张还多了一层假**：板上最满的一周只有 11 项，纸面装得下，配平永远是 100% —— 想拍到「配平 72%」和「压到下限仍超纸面」，必须往内存里灌合成任务（`shoot.py` 的 STRESS 类，id 一律 `stress-*`，只活在临时 profile 里，`__net` 全程 0）。所以那两张图上的卡片密度**不代表任何真实的一周**，用来看观感和读数，不是用来看工作量。
 
 ```bash
 python3 .preview/anonymize_seed.py                                   # → .preview/seed-anon.json
 python3 .preview/build.py .preview/seed-anon.json .preview/preview-anon.html
+python3 -m http.server 8899 --bind 127.0.0.1 --directory .preview &  # 服务起着
+python3 .preview/shoot.py                                            # → docs/screenshots/ + docs/sheet-facts.json
+python3 .preview/verify_sheet.py                                     # 改 CSS 后跑它，别只信眼睛
 ```
+
+`shoot.py` 走的是无头 Chromium（Playwright，`chromium_headless_shell`），**不依赖 In-app Browser 面板在前台**——这是这轮换的手段，理由见「关键决策」第 9 条。它只打打码版：脚本开头有一句 `if "preview-anon" not in base: sys.exit(...)`，防止手滑拿真种子出图。重跑一次 `sheet-facts.json` 逐字节一致（版面读数确定），所以它是可以当回归用的。
+
+| 图 | 看什么 |
+| --- | --- |
+| ![nil page](./docs/screenshots/2026-09-21-sheet-nil-page.png) | **占位页**：页眉「此页无图 · No Work To Plot」+ 右侧「占位」，图面正中虚线框写清为什么没图（这一段里没有未完成任务…），图签栏张次 `NIL`。纸面 1512×1047 一格未缩 |
+| ![toc](./docs/screenshots/2026-09-21-sheet-toc-volumes.png) | **图纸目录**（按人成册两周，9 张）：`01…08` 张次、`WTP-2026-W38-01` 图号、`VOL 01…04` 卷号，卷与卷之间断一行（首卷不断），张次 `INDEX` |
+| ![volume](./docs/screenshots/2026-09-21-sheet-volume-page.png) | **一卷的内页**：一个人一周的卡片走多列流（`sparse` 两列），页眉右侧「第 06 / 09 张」，图签栏带 `册` 一格 |
+| ![weeks suite](./docs/screenshots/2026-09-21-sheet-weeks-suite.png) | **按周连排最满的一张**：四人四列通栏、每列一个 `分图 01…04` 图框带角裁切标记、图签栏贴住纸的下边线 |
+| ![fit strip](./docs/screenshots/2026-09-21-sheet-fit-strip.png) | **配平读数**：预览条 `1 张 · A3 横排 · WTP-2026-W39 · 配平 72%`，下面整张纸等比缩到 72%（21 项 / 自然高 1450px）。这条只在非 `?sheet` 路径拍得到，原因见「测量陷阱」第 9 条 |
+| ![spill](./docs/screenshots/2026-09-21-sheet-fit-spill.png) | **压到下限仍超纸面**：33 项、自然高 1935px，`fc` 卡在 `0.66` 不再压，纸外一圈锈色虚线（`.is-spill`），读数会写「1 张压到下限仍超纸面 · 出纸会续页」 |
 
 | 图 | 看什么 |
 | --- | --- |
 | ![paper board](./docs/screenshots/2026-09-21-paper-board.png) | 日览配色整体版面：图签头、统计条、四条人列、已完成卡片上的 45° 剖面线、`新增` 卡片的内侧虚线（修订云线轻量版） |
 | ![blueprint board](./docs/screenshots/2026-09-21-blueprint-board.png) | 蓝图夜览同一版面；`SHT 01…04` 图幅号、列头负荷迷你格、尺寸线进度条在深色下的读法 |
 | ![blueprint revision](./docs/screenshots/2026-09-21-blueprint-revision-table.png) | 修订表展开态（版次 / 时间 / 修改 三栏，四行真实变更：优先级、两次进度、备注），`REV 4` 徽标与 `P1 高` 一起看 |
-| ![print sheet](./docs/screenshots/2026-09-21-print-sheet-a3.png) | **已过期**：拍的是 `744ccd2` 的旧晒图版面（2×2 图幅 + 底部单块图签）。现在的出图是四列通栏 + 每张纸各自带图签，还多了目录页与连排/分册两种排法，这张图已经代表不了它 |
+| ![print sheet](./docs/screenshots/2026-09-21-print-sheet-a3.png) | **已过期**：拍的是 `744ccd2` 的旧晒图版面（2×2 图幅 + 底部单块图签）。现在的出图是四列通栏 + 每张纸各自带图签，还多了目录页与连排/分册两种排法，看上面那批 |
 | ![mobile 390](./docs/screenshots/2026-09-21-mobile-390.png) | 390×844 真实手机版面（同源 iframe 拍的，见 `.preview/mobile-frame.html`）：工具栏换行、人列纵向堆叠、`scrollWidth` 390 = 视口宽，无横向溢出 |
 
-拍摄时统一注入 `transition:none;animation:none`（理由见上面「测量陷阱」第 1 条），主题直接写 `document.body.dataset.theme` 并断言 `--paper-raised`（日览 `#FBF9F5` / 蓝图 `#132837`），没有拿点击当事实。
+拍摄时统一注入 `transition:none;animation:none`（理由见上面「测量陷阱」第 1 条）。每轮的版面数字（张数、每页卡数、自然高、`fc`、`spill`、摘要原文、纸面/条底色）随图落在 `docs/sheet-facts.json`，比逐张肉眼读图可靠。
 
-**新版出图的留档还欠着**：面板不在前台时 `take_screenshot` 直接报 `NATIVE_BROWSER_VIEWPORT_UNAVAILABLE`（`viewport=0x0, visible=false`），而这台机器没有无头浏览器兜底，所以只能等 In-app Browser 被点到前台再拍（命令序列见「怎么验证」那条 `?sheet&…` URL）。
+**蓝图主题下纸面仍然是白的，这是设计不是 bug**：`#print-stack` 就地覆盖了一整套纸面令牌（打印机给不出深蓝底，屏上预览与出纸因此同一份观感）。实测：`theme=blueprint` 时预览条 `rgb(19,40,55)`、纸面 `rgb(255,255,255)`。**别去读 `body` 上的 `--paper-raised`**，它照样是 `#132837`，读了会以为图拍错了。
+
 
 ## 还欠着的
 
-1. **新版出图的留档一张都没有**：`docs/screenshots/2026-09-21-print-sheet-a3.png` 已经过期（拍的是旧 2×2 单张版面），目录页 / 按周连排 / 按人成册 / 预览层 / 占位页都没拍。卡在同一件事上：面板不在前台时 `take_screenshot` 直接 `NATIVE_BROWSER_VIEWPORT_UNAVAILABLE`，而这台机器没有无头浏览器（`node` 也不在 PATH 上）。要么用户点一下 In-app Browser 让它到前台，要么放弃留档只留 `?sheet&…` 这几个可复现 URL。
-2. **其余留档缺口**：拖拽进行中的版面（CAD 选择集观感）没拍；手机版只有一张首屏，长版面没连拍。
+1. **留档还剩的缺口**：拖拽进行中的版面（CAD 选择集观感）没拍；手机版只有一张首屏，长版面没连拍；出图预览层的**对话框**（晒图设置那五格）没拍；`?sheet` 页面上拍不到预览条（见「测量陷阱」第 9 条），要拍得走 STRESS 那条不带 `?sheet` 的路。占位页与配平两端（72% / 66% 下限）本轮已补齐。
+2. **harness 的依赖没纳管**：`shoot.py` 与 `verify_sheet.py` 要 `pip3 install --user playwright` + `python3 -m playwright install chromium`（约 120MB，装在 `~/Library/Caches/ms-playwright`）。`.preview/` 整个目录仍在仓库外，换机器要重建（本轮已经见过一次 iCloud 搬目录）。要不要纳管，用户明确说这轮先改功能。
 3. **团队配 Token**：另外三位同事各刷一次页面，然后各自在 ⚙ 设置里贴 Token 点「保存并同步」（每台浏览器单独配，Token 不共享）。
-4. **harness 不在版本控制里**：`.preview/` 是 `weekly-tracker/` 的同级目录，换机器要重建（本轮已经见过一次 iCloud 搬目录）。要不要纳管，用户明确说这轮先改功能。
-5. 未排期的候选方向（四条轨道里「出图模式」这轮落地，剩下的）：
+4. 未排期的候选方向（四条轨道里「出图模式」这轮落地，剩下的）：
    - 负荷条只有任务数，没有工时维度；
    - 修订表按任务卡展开，还没有按周汇总的全局修订页；
    - 配平只到「提示续页」，没有真正的**跨页续排**（同一人列自动分到两张纸、第二张标 `SHT 03/13 (续)`）；
