@@ -914,10 +914,16 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
 }
 .sheet-page {
   position: relative;
+  display: flex; flex-direction: column;
   width: 1512px; min-height: 1047px;
   padding: 22px 26px 18px;
   transform-origin: 0 0; transform: scale(var(--fit));
 }
+/* 图签栏钉在纸的下边线：让图面自己吃掉剩余高度，而不是把空白留在纸尾。
+   留白在图框里是「这周就这么点活」，留在纸尾像没排版。
+   图签栏自己的 margin-top: 6mm 就是最小间距，装不下时也不会贴住最后一张卡。 */
+.sheet-page > .sheet-board, .sheet-page > .sheet-flow,
+.sheet-page > .sheet-nil, .sheet-page > .toc { flex: 1 1 auto; }
 /* 压到下限还是装不下 —— 预览里标出来，别等打印机吐出两张才发现 */
 .sheet-paper.is-spill { outline: 1px dashed var(--rust); outline-offset: 3px; }
 .sheet-head {
@@ -932,6 +938,12 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
 .sh-right { text-align: right; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; color: var(--ink-3); white-space: nowrap; }
 .sh-right b { display: block; font-size: 15px; font-weight: 500; letter-spacing: .02em; color: var(--ink); margin-top: 2px; font-variant-numeric: tabular-nums; }
 .sheet-page .card-del, .sheet-page .column-footer { display: none; }
+/* 屏上那句「点击输入任务名称」是编辑提示，纸上没有可点的东西，
+   留在晒出去的图上像是谁忘了填 —— 换成图纸的写法，只说它没名字。
+   必须挑「里面确实挂着 placeholder」的那张卡：写成 .task-name::after 会给
+   有名字的卡也补一刀，晒出来全是「示例项目 B（未命名）」。 */
+.sheet-page .task-name .placeholder { display: none; }
+.sheet-page .task-name:has(> .placeholder)::after { content: '（未命名）'; color: var(--ink-3); }
 .sheet-page .task-card { cursor: default; animation: none; break-inside: avoid; }
 .sheet-page .column { box-shadow: none; }
 .sheet-page .column:hover { box-shadow: none; }
