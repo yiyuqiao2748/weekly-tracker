@@ -989,6 +989,26 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
   font-size: 11.5px; line-height: 1.75; color: var(--ink-2);
 }
 
+/* 空册占位页：一张「此页无图」，虚线框是留给图纸本身的语汇，不是报错样式 */
+.sheet-nil {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 640px; padding: 10mm 0;
+}
+.sheet-nil .nil-box {
+  width: 74%; padding: 12mm 10mm; text-align: center;
+  border: 1px dashed var(--hair-strong); background: var(--paper);
+}
+.sheet-nil .nil-t {
+  font-family: var(--f-display); font-size: 21px; letter-spacing: .06em; color: var(--ink);
+}
+.sheet-nil .nil-w {
+  margin-top: 5mm; font-size: 12px; line-height: 1.85; color: var(--ink-2);
+}
+.sheet-nil .nil-meta {
+  margin-top: 8mm; padding-top: 4mm; border-top: 1px solid var(--hair);
+  font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .1em; color: var(--ink-3);
+}
+
 @media print {
   /* 剖面线、尺寸线填充是这张图的信息，不能让浏览器默认的背景打印抹掉 */
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -2254,7 +2274,7 @@ const SheetSet = {
       { k: '图号', v: sheet.code },
     ];
     if (sheet.vol) cells.push({ k: '册', v: sheet.vol });
-    cells.push({ k: '张次', v: sheet.toc ? 'INDEX' : `SHT ${pad(sheet.no)}/${pad(plan.total)}` });
+    cells.push({ k: '张次', v: sheet.toc ? 'INDEX' : sheet.nil ? 'NIL' : `SHT ${pad(sheet.no)}/${pad(plan.total)}` });
     cells.push({ k: '签发', v: `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}` });
     cells.push({ k: '比例', v: 'NTS' });
     cells.push({ k: '版次', v: 'R1' });
@@ -2270,7 +2290,7 @@ const SheetSet = {
         <div class="sh-title">${esc(sheet.title)}</div>
         <div class="sh-sub">效果图部门 · 周任务进度表 · ${esc(sheet.code)}${sheet.vol ? ' · ' + esc(sheet.vol) : ''}</div>
       </div>
-      <div class="sh-right"><span>${esc(suiteRangeLabel(plan))}</span><b>${sheet.toc ? '目录' : `第 ${String(sheet.no).padStart(2, '0')} / ${String(plan.total).padStart(2, '0')} 张`}</b></div>
+      <div class="sh-right"><span>${esc(suiteRangeLabel(plan))}</span><b>${sheet.toc ? '目录' : sheet.nil ? '占位' : `第 ${String(sheet.no).padStart(2, '0')} / ${String(plan.total).padStart(2, '0')} 张`}</b></div>
     </div>`;
   },
 
@@ -2394,6 +2414,41 @@ const SheetSet = {
       + this._tbCells(plan, Object.assign({}, meta, { title: '周任务进度表 · 图纸目录' }));
   },
 
+  // 零张纸的原因有两种：区间本身没数据，或者收录范围把它滤空了 —— 别把后者说成「四个人都排空了」
+  nilReason(cfg) {
+    if (cfg.scope === 'filtered') return '看板当前的搜索与筛选把这一段全滤掉了';
+    if (cfg.scope === 'open') return '这一段里没有未完成任务，「只出未完成」就一张也不剩';
+    return cfg.mode === 'persons'
+      ? '四个人在这个区间都没排任务，按人成册就不出空卷'
+      : '这一段里板上没有任务';
+  },
+
+  // 空册也要有一张纸可打：按人成册时如果区间内一个人排的任务都没有，
+  // 排纸结果是 0 张 —— 屏上是一片空白、摘要写「0 张」、打印机直接出零页，
+  // 谁都不知道是没活还是没配对。给一张「此页无图」占位页，图上写清楚为什么。
+  _emptySheet(plan, cfg) {
+    const meta = {
+      week: plan.last, no: 0, nil: true, period: this.suiteRange(plan),
+      title: '此页无图 · No Work To Plot',
+      code: this.suiteCode(plan),
+      people: C.MEMBERS.join(' · '),
+    };
+    const why = this.nilReason(cfg) + '。';
+    const hint = (cfg.mode === 'persons' ? '换成「按周连排」会把没排任务的周也画出来，作为缺口的证据；' : '')
+      + '或者把「截止周」挪到有活的那几周'
+      + (cfg.scope === 'all' ? '。' : '，也可以把收录范围换回「全部任务」。');
+    return this._head(meta, plan)
+      + `<div class="sheet-nil"><div class="nil-box">`
+      + `<div class="nil-t">本区间没有可出的任务</div>`
+      + `<div class="nil-w">${esc(why)}</div>`
+      + `<div class="nil-w">${esc(hint)}</div>`
+      + `<div class="nil-meta">区间 ${esc(this.weekLabel(plan.first))} — ${esc(this.weekLabel(plan.last))} · 收录范围 `
+      + `${esc({ all: '全部任务', open: '只出未完成', filtered: '沿用看板当前筛选' }[cfg.scope])}`
+      + ` · 板上任务总数 ${esc(String(DataModel.state.tasks.length))}</div>`
+      + `</div></div>`
+      + this._tbCells(plan, Object.assign({}, meta, { title: '周任务进度表 · 此页无图' }));
+  },
+
   // ---- 铺纸 / 预览 / 出纸 -------------------------------------------
 
   build(cfg) {
@@ -2414,6 +2469,8 @@ const SheetSet = {
         ? this._weekSheet(s, plan, this.cfg)
         : this._personSheet(s, plan, this.cfg)));
     });
+    // 一张都没有：换成「此页无图」占位页，屏上有解释、纸上也有东西可打
+    if (!plan.sheets.length) html.push(page(this._emptySheet(plan, this.cfg)));
     document.getElementById('print-stack').innerHTML = html.join('');
     this.fit();
     return plan;
@@ -2484,6 +2541,11 @@ const SheetSet = {
   summaryText(plan, withRange) {
     const cfg = plan.cfg;
     const bits = [`${plan.total} 张`, 'A3 横排', this.suiteCode(plan)];
+    if (!plan.sheets.length) {
+      bits.length = 0;
+      bits.push('此页无图', 'A3 横排', this.suiteCode(plan), this.nilReason(cfg) + ' · 出一张占位页');
+      return bits.join(' · ');
+    }
     if (cfg.mode === 'persons') bits.push('按人成册');
     if (cfg.scope === 'open') bits.push('只出未完成');
     if (cfg.scope === 'filtered') bits.push('沿用当前筛选');
