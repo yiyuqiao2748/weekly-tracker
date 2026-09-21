@@ -1125,6 +1125,7 @@ const GistSync = {
   },
 
   async _doPush(state) {
+    this._pushTimer = null;   // 一旦开跑就没有「等待上传」这回事了，pagehide 不该再补发
     SaveBtn.setSaving();
     SyncStatus.syncing();
     if (!this.reachable) {
@@ -1154,6 +1155,24 @@ const GistSync = {
       SyncStatus.error(why);
     }
     return ok;
+  },
+
+  // 防抖那 3 秒里关掉页面，改动就悄悄丢了 —— 而按钮那时正显示「点击上传到云端」，
+  // 谁都不会觉得自己没存上。pagehide 里用 keepalive 补发一次，浏览器会替我们把请求送完。
+  flushOnHide() {
+    window.addEventListener('pagehide', () => {
+      if (!this._pushTimer) return;
+      this._pushTimer = null;
+      if (!this.reachable) return;            // 本次会话没读到过云端，宁可不发（见 _doPush）
+      const cfg = this.loadConfig();
+      if (!cfg.gistId || !cfg.token) return;
+      fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+        method: 'PATCH',
+        keepalive: true,
+        headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json' },
+        body: JSON.stringify({ files: { 'weekly-data.json': { content: JSON.stringify(DataModel.state, null, 2) } } }),
+      }).catch(() => {});
+    });
   },
 };
 
@@ -2410,6 +2429,7 @@ const App = {
     this.bindSettings();
     this.bindGlobalKeys();
     this.bindSaveBtn();
+    GistSync.flushOnHide();
     this.bindTheme();
     Renderer.renderAll(DataModel.state.currentWeek);
 
