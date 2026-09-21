@@ -278,9 +278,12 @@ body {
   background: var(--paper-raised);
   border: 1px solid var(--hair);
   padding: 9px 10px 10px;
-  cursor: default;
-  transition: border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
-  animation: card-in .3s var(--ease) both;
+  cursor: grab;   /* 可编辑子元素各自覆盖成 text/pointer，留白处即起拖区 */
+  -webkit-touch-callout: none;
+  transition: border-color .18s var(--ease), box-shadow .18s var(--ease),
+              background .18s var(--ease), opacity .18s var(--ease);
+  animation: card-in .3s var(--ease) backwards;
+  /* 不能用 both：动画填充会把 .dragging 的旋转和兄弟卡片的淡出一起锁死 */
 }
 /* 左侧引线：hover 时展开 */
 .task-card::before {
@@ -294,6 +297,23 @@ body {
 .task-card[data-status="已完成"] {
   background-image: repeating-linear-gradient(45deg, var(--hatch) 0 1px, transparent 1px 8px);
 }
+/* ===== 拖拽排序 —— CAD 选择集观感 ===== */
+.task-card.dragging {
+  border-color: var(--blueprint);
+  border-style: dashed;
+  box-shadow: var(--shadow-2);
+  outline: 1px dashed var(--blueprint);
+  outline-offset: 3px;
+  transform: rotate(-.5deg);
+  cursor: grabbing;
+  z-index: 4;
+  transition: none;
+}
+.task-card.dragging::before { transform: scaleY(1); }
+#board.drag-active { user-select: none; cursor: grabbing; }
+#board.drag-active .task-card:not(.dragging) { opacity: .5; }
+/* 拖动中/落位后都关掉入场动画：DOM 重新插入会让它一遍遍重播 */
+#board.drag-active .task-card, #board.no-anim .task-card { animation: none; }
 .task-card .card-row { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
 .task-card .card-row:last-child { margin-bottom: 0; }
 .task-card .card-row.wrap { flex-wrap: wrap; }
@@ -809,6 +829,10 @@ const C = {
   STATUSES: ['未开始', '进行中', '已完成'],
   PRIO_CLASSES: { '高': 'prio-high', '中': 'prio-med', '低': 'prio-low' },
   PRIO_CODES: { '高': 'P1', '中': 'P2', '低': 'P3' },
+  FIELD_CN: {
+    name: '名称', priority: '优先级', status: '状态', progress: '进度',
+    startDate: '开始日期', dueDate: '截止日期', notes: '备注',
+  },
 };
 
 function esc(s) {
@@ -1206,14 +1230,33 @@ const Storage = {
 const DataModel = {
   state: null,
 
-  init(raw) { this.state = raw; },
+  init(raw) {
+    this.state = raw;
+    this._normalizeOrder();
+  },
+
+  // Gist 上的旧数据没有 order，按数组顺序补在末尾，避免排序时互相覆盖
+  _normalizeOrder() {
+    const tasks = this.state.tasks || [];
+    let max = -1;
+    tasks.forEach(t => { if (typeof t.order === 'number' && t.order > max) max = t.order; });
+    tasks.forEach(t => { if (typeof t.order !== 'number') t.order = ++max; });
+  },
+
+  _nextOrder() {
+    return (this.state.tasks || []).reduce((m, t) => Math.max(m, t.order || 0), 0) + 1;
+  },
+
+  _byOrder(a, b) { return (a.order || 0) - (b.order || 0); },
 
   getTasks(weekStr) {
-    return this.state.tasks.filter(t => t.week === weekStr);
+    return this.state.tasks.filter(t => t.week === weekStr).sort(this._byOrder);
   },
 
   getTasksByPerson(weekStr, person) {
-    return this.state.tasks.filter(t => t.week === weekStr && t.person === person);
+    return this.state.tasks
+      .filter(t => t.week === weekStr && t.person === person)
+      .sort(this._byOrder);
   },
 
   getPrevWeekTasks(weekStr) {
@@ -1233,6 +1276,7 @@ const DataModel = {
       dueDate: '',
       notes: '',
       week: weekStr,
+      order: this._nextOrder(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -1248,6 +1292,7 @@ const DataModel = {
   updateField(taskId, field, value) {
     const task = this.state.tasks.find(t => t.id === taskId);
     if (!task) return;
+    UndoStack.push('修改' + (C.FIELD_CN[field] || field));
     task[field] = value;
     if (field === 'status') this._applyStatusConstraint(task);
     else if (field === 'progress') this._applyProgressConstraint(task);
@@ -1283,6 +1328,7 @@ const DataModel = {
       copy.week = weekStr;
       copy.progress = 0;
       copy.status = '未开始';
+      copy.order = this._nextOrder();   // 深拷贝会带上源任务的 order，会和本周撞位
       copy.createdAt = new Date().toISOString();
       copy.updatedAt = new Date().toISOString();
       this.state.tasks.push(copy);
@@ -1299,7 +1345,10 @@ const DataModel = {
 // Renderer — Card-based layout
 // ======================================================================
 const Renderer = {
-  renderAll(weekStr) {
+  // noAnim：局部改动（拖拽落位、撤销）不要整版重播入场动画。
+  // 类留在 board 上直到下一次带动画的渲染，中途摘掉会让现有卡片重新开始动画。
+  renderAll(weekStr, noAnim) {
+    document.getElementById('board').classList.toggle('no-anim', !!noAnim);
     this.renderToolbar(weekStr);
     this.renderStats(weekStr);
     this.renderBoard(weekStr);
@@ -1753,6 +1802,7 @@ const Actions = {
   },
 
   addTask(person) {
+    UndoStack.push('新增任务');
     const task = DataModel.addTask(DataModel.state.currentWeek, person);
     Renderer.renderAll(DataModel.state.currentWeek);
     // Start editing the new card's name field
@@ -1768,31 +1818,188 @@ const Actions = {
   deleteTask(taskId) {
     const idx = DataModel.state.tasks.findIndex(t => t.id === taskId);
     if (idx === -1) return;
+    UndoStack.push('删除任务');
     const deleted = DataModel.state.tasks.splice(idx, 1)[0];
     DataModel._save();
     Renderer.renderAll(DataModel.state.currentWeek);
-    Toast.showUndo(`已删除「${deleted.name || '未命名任务'}」`, () => {
-      DataModel.state.tasks.push(deleted);
-      DataModel._save();
-      Renderer.renderAll(DataModel.state.currentWeek);
-      Toast.show('已恢复任务');
-    }, 8000);
+    // Toast 上的撤销只把这一条放回去；走 UndoStack.undo 会连带吞掉删除之后的编辑
+    Toast.showUndo(`已删除「${deleted.name || '未命名任务'}」`, () => this.undelete(deleted, idx), 8000);
+  },
+
+  undelete(task, idx) {
+    if (DataModel.state.tasks.some(t => t.id === task.id)) return;
+    DataModel.state.tasks.splice(Math.min(idx, DataModel.state.tasks.length), 0, task);
+    DataModel._save();
+    Renderer.renderAll(DataModel.state.currentWeek, true);
+    Toast.show(`已恢复「${task.name || '未命名任务'}」`);
   },
 
   copyFromPrev() {
+    UndoStack.push('复制上周未完成');
     const { copies, skipped } = DataModel.copyIncompleteFromPrev(DataModel.state.currentWeek);
     if (copies.length === 0) {
+      UndoStack.discard();
       Toast.show(skipped > 0 ? `上周未完成任务本周已存在` : '上周没有未完成的任务');
       return;
     }
     Renderer.renderAll(DataModel.state.currentWeek);
-    const ids = new Set(copies.map(c => c.id));
-    Toast.showUndo(`已复制 ${copies.length} 个未完成任务`, () => {
-      DataModel.state.tasks = DataModel.state.tasks.filter(t => !ids.has(t.id));
-      DataModel._save();
-      Renderer.renderAll(DataModel.state.currentWeek);
-      Toast.show('已撤销复制');
-    }, 8000);
+    const ids = copies.map(c => c.id);
+    Toast.showUndo(`已复制 ${copies.length} 个未完成任务`, () => this.uncopy(ids), 8000);
+  },
+
+  uncopy(ids) {
+    const set = new Set(ids);
+    DataModel.state.tasks = DataModel.state.tasks.filter(t => !set.has(t.id));
+    DataModel._save();
+    Renderer.renderAll(DataModel.state.currentWeek, true);
+    Toast.show('已撤销复制');
+  },
+};
+
+// ======================================================================
+// UndoStack — 多级撤销（任务数组快照制）
+// ======================================================================
+const UndoStack = {
+  items: [],
+  limit: 20,
+
+  push(label) {
+    if (!DataModel.state) return;
+    this.items.push({ label, tasks: JSON.parse(JSON.stringify(DataModel.state.tasks)) });
+    if (this.items.length > this.limit) this.items.shift();
+  },
+
+  undo() {
+    const it = this.items.pop();
+    if (!it) { Toast.show('没有可撤销的操作'); return false; }
+    DataModel.state.tasks = it.tasks;
+    DataModel._save();
+    Renderer.renderAll(DataModel.state.currentWeek, true);
+    Toast.show(`已撤销：${it.label}`);
+    return true;
+  },
+
+  // 动作最后发现什么都没改时，丢掉预先入栈的快照
+  discard() { this.items.pop(); },
+};
+
+// ======================================================================
+// CardDrag — 拖拽排序与跨列改派（Pointer Events）
+// ======================================================================
+const CardDrag = {
+  pending: null,
+  session: null,
+  _suppressClick: false,
+
+  // 由 #board 的 pointerdown 调用；尺寸线与删除按钮不归它管
+  arm(e, card) {
+    if (this.session || this.pending || Editor.currentField) return;
+    const s = {
+      card,
+      sx: e.clientX,
+      sy: e.clientY,
+      armed: e.pointerType !== 'touch',
+      timer: 0,
+    };
+    // 触屏先长按 200ms 再认拖；在此之前移动都当作页面滚动
+    if (!s.armed) s.timer = setTimeout(() => { s.armed = true; }, 200);
+    s.onMove = ev => this._move(s, ev);
+    s.onEnd = () => this._end(s);
+    window.addEventListener('pointermove', s.onMove);
+    window.addEventListener('pointerup', s.onEnd);
+    window.addEventListener('pointercancel', s.onEnd);
+    // pointermove 对触摸手势不可取消：长按生效后必须用 touchmove 掐掉页面滚动
+    if (!s.armed) {
+      s.onTouchMove = ev => { if (s.armed) ev.preventDefault(); };
+      window.addEventListener('touchmove', s.onTouchMove, { passive: false });
+    }
+    this.pending = s;
+  },
+
+  _move(s, ev) {
+    const d = Math.abs(ev.clientX - s.sx) + Math.abs(ev.clientY - s.sy);
+    if (!s.armed) {
+      if (d > 12) this._end(s);
+      return;
+    }
+    if (!this.session) {
+      if (d < 6) return;
+      this._engage(s);
+    }
+    ev.preventDefault();
+    this._place(ev.clientX, ev.clientY);
+  },
+
+  _engage(s) {
+    clearTimeout(s.timer);
+    this.session = s;
+    UndoStack.push('拖拽排序');
+    s.card.classList.add('dragging');
+    document.getElementById('board').classList.add('drag-active');
+  },
+
+  _place(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const col = el && el.closest ? el.closest('.column') : null;
+    const body = col && col.querySelector('.column-body');
+    if (!body) return;
+    const dragged = this.session.card;
+    body.classList.remove('empty');
+    let ref = null;
+    body.querySelectorAll('.task-card').forEach(c => {
+      if (ref || c === dragged) return;
+      const r = c.getBoundingClientRect();
+      if (y < r.top + r.height / 2) ref = c;
+    });
+    if (ref) body.insertBefore(dragged, ref);
+    else body.appendChild(dragged);
+  },
+
+  _end(s) {
+    window.removeEventListener('pointermove', s.onMove);
+    window.removeEventListener('pointerup', s.onEnd);
+    window.removeEventListener('pointercancel', s.onEnd);
+    if (s.onTouchMove) window.removeEventListener('touchmove', s.onTouchMove);
+    clearTimeout(s.timer);
+    if (this.session) this._commit();
+    if (this.pending === s) this.pending = null;
+    this.session = null;
+  },
+
+  _commit() {
+    const board = document.getElementById('board');
+    this.session.card.classList.remove('dragging');
+    board.classList.remove('drag-active');
+    this._suppressClick = true;
+
+    const slots = [];
+    board.querySelectorAll('.column').forEach(col => {
+      const person = C.MEMBERS[Number(col.id.split('-')[1])];
+      col.querySelectorAll('.column-body > .task-card').forEach(c =>
+        slots.push({ id: c.dataset.taskId, person }));
+    });
+
+    let moved = 0, reassigned = 0;
+    slots.forEach((slot, i) => {
+      const t = DataModel.state.tasks.find(x => x.id === slot.id);
+      if (!t) return;
+      let hit = false;
+      if (t.order !== i) { t.order = i; hit = true; }
+      if (t.person !== slot.person) { t.person = slot.person; hit = true; reassigned++; }
+      if (hit) { t.updatedAt = new Date().toISOString(); moved++; }
+    });
+
+    if (!moved) { UndoStack.discard(); return; }   // 没真的挪动，不留空快照
+    DataModel._save();
+    Renderer.renderAll(DataModel.state.currentWeek, true);
+    Toast.show(reassigned ? `已改派 ${reassigned} 个任务` : '已调整顺序');
+  },
+
+  // 拖完会紧跟一个 click，吞掉它以免误开编辑
+  consumeClick() {
+    if (!this._suppressClick) return false;
+    this._suppressClick = false;
+    return true;
   },
 };
 
@@ -1881,6 +2088,8 @@ const App = {
     const board = document.getElementById('board');
 
     board.addEventListener('click', (e) => {
+      if (CardDrag.consumeClick()) return;
+
       const add = e.target.closest('.btn-add-person');
       if (add) { Actions.addTask(add.dataset.person); return; }
 
@@ -1898,9 +2107,14 @@ const App = {
     board.addEventListener('pointerdown', (e) => {
       if (e.button > 0) return;
       const dim = e.target.closest('.dim');
-      if (!dim) return;
-      e.preventDefault();
-      Editor.beginDrag(dim, dim.closest('.task-card'), e);
+      if (dim) {
+        e.preventDefault();
+        Editor.beginDrag(dim, dim.closest('.task-card'), e);
+        return;
+      }
+      if (e.target.closest('.card-del')) return;
+      const card = e.target.closest('.task-card');
+      if (card) CardDrag.arm(e, card);
     });
   },
 
@@ -1969,6 +2183,13 @@ const App = {
         } else {
           document.getElementById('settings-overlay').classList.remove('show');
         }
+      }
+      // Ctrl/Cmd+Z：多级撤销（输入框里留给浏览器原生的文本撤销）
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        const a = document.activeElement;
+        if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return;
+        e.preventDefault();
+        UndoStack.undo();
       }
       // Ctrl+S: manual save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
