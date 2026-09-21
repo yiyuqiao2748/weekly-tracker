@@ -214,5 +214,56 @@
     "paperBg": "rgb(255, 255, 255)",
     "barBg": "rgb(251, 249, 245)",
     "net": 0
+  },
+  {
+    "job": "2026-09-21-sheet-dialog.png",
+    "why": "晒图设置对话框那五格（截止周 / 连排周数 / 分册方式 / 收录范围 / 目录开关）+ 摘要行",
+    "shown": true,
+    "from": "2026-W39",
+    "count": "1",
+    "countOptions": 8,
+    "mode": [
+      "按周连排"
+    ],
+    "scope": [
+      "全部任务"
+    ],
+    "toc": true,
+    "summary": "1 张 · A3 横排 · WTP-2026-W39",
+    "net": 0,
+    "stressLeft": 0
+  },
+  {
+    "job": "2026-09-21-board-dragging.png",
+    "why": "拖拽进行中的看板：被拖的卡抬起旋转，兄弟卡淡到 50%（CAD 选择集的读法）",
+    "dragging": true,
+    "dragActive": true,
+    "card": "示例项目 P（旗舰店）",
+    "inColumn": "column-1",
+    "cardTransform": "matrix(0.999962, -0.00872654, 0.00872654, 0.99",
+    "sibOpacity": "0.5",
+    "stressLeft": 0,
+    "net": 0,
+    "from": "示例项目 P（旗舰店）",
+    "onto": "column-1"
+  },
+  {
+    "job": "2026-09-21-mobile-board-long.png",
+    "why": "390×844 手机整页长版面（首屏之外还有四条人列纵向堆叠与统计条）",
+    "viewW": 390,
+    "scrollW": 390,
+    "overflowX": false,
+    "columns": 4,
+    "stacked": true,
+    "colTops": [
+      320,
+      624,
+      1240,
+      2004
+    ],
+    "cards": 11,
+    "stressLeft": 0,
+    "pageH": 2696,
+    "net": 0
   }
 ]
