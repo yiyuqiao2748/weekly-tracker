@@ -366,6 +366,8 @@ button.chip.rev:hover { background: var(--blueprint-soft); }
 /* ===== 列头个人负荷（最近 8 周） ===== */
 .spark { display: flex; align-items: flex-end; gap: 2px; height: 14px; margin-top: 5px; }
 .spark i { display: block; width: 3px; min-height: 1px; background: var(--spark-hist); }
+/* 空白周读作「缺席」而不是「一条很矮的任务」，所以刻意压到几乎看不见：
+   它不是需要被读懂的图形（数字在 title 里），提亮反而会让 0 比有任务还显眼 */
 .spark i.zero { background: var(--hair-strong); opacity: .5; }
 .spark i.now { background: var(--blueprint); }
 .task-card .card-row { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
@@ -519,6 +521,21 @@ button.chip.rev:hover { background: var(--blueprint-soft); }
 .task-card:hover .card-del { opacity: 1; }
 .card-del:hover { color: var(--rust); border-color: var(--rust); }
 @media (hover: none) { .card-del { opacity: .55; } }
+
+/* ===== 点击热区 =====
+   这张板子的字号是照着制图密度定的，不能为了手指放大；所以只把「可点范围」向外借
+   已有的空白，墨迹一像素不动。展开量按卡片 9/10px 内边距、行距 6px、工具栏 gap 16px 量过。
+   下面写的是申请值，实际生效范围由绘制顺序自动收敛：越界的带状区会落进下一行的盒子里，
+   而那行自己可点（进度条、备注、任务名），后画的盒子赢 —— 也就是永远抢不走邻居的点击。
+   2026-09-21 用 elementFromPoint 逐点采样验证：删除叉 16×16 → 27×22，REV 徽标 28×15 → 39×18，
+   工具栏按钮 27×25 → 27×36（只上下扩，同排按钮密集，横向扩会互相抢），三处合计 0 例误触。
+   注意生效范围比声明值少约 1px：绝对定位的伪元素是相对 padding box 展开的，那 1px 给了边框。
+   副作用：这层向外扩的伪元素会计入 scrollWidth，所以自动化「横向溢出」扫描会把 chip 报成
+   sw 34 / cw 26 —— 实测 chip 自然宽 27.9 = 盒宽、文字 17.9 = 内容盒，一个字都没溢出。 */
+#toolbar button, .card-del, button.chip.rev { position: relative; }
+#toolbar button::after { content: ''; position: absolute; inset: -7px 0; }
+.card-del::after { content: ''; position: absolute; inset: -5px -8px -4px -5px; }
+button.chip.rev::after { content: ''; position: absolute; inset: -3px -8px -3px -5px; }
 
 /* ===== Inline Edit ===== */
 .editable { cursor: pointer; }
@@ -1808,9 +1825,10 @@ const Renderer = {
         ${this._renderProgressBar(task.progress)}
       </div>
       <div class="card-row">
+        <!-- 中间那枚破折号是尺寸线连接符，纯装饰：aria-hidden 让读屏别念出「dash」 -->
         <span class="task-dates">
           <span class="date-range editable" data-field="startDate" title="开始日期">${this._formatSingleDate(task.startDate)}</span>
-          <em>—</em>
+          <em aria-hidden="true">—</em>
           <span class="date-range editable" data-field="dueDate" title="结束日期">${this._formatSingleDate(task.dueDate)}</span>
         </span>
         <span class="rev-slot">${this._revChips(hist.length, delta)}</span>
