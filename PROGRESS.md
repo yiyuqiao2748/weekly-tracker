@@ -2,7 +2,7 @@
 
 功能清单看 [README.md](./README.md)，这里只记**过程**：为什么做成这样、哪些结论被推翻过、验证要靠什么手段、还剩什么没做。
 
-最后更新：2026-09-21 深夜（第二轮）。留档缺口补齐（晒图设置对话框 / 拖拽进行中 / 手机整页长版面三张，共十四张），并把出图**真出成 PDF 数了页数**——当场抓到一条 CSS 特异性导致的**分页缺陷**：只要纸铺在预览层里，打印时第一张之后的纸会**静默消失**，不报错、屏上也看不出异常。修复只动 `@media print` 里那一条规则（+8/−3，其中 5 行是解释注释），一行 JS 没动，四种排法现在 9→9、9→9、1→1、1→2 页全部对上账。缺陷随预览层一起进来（`git log -S` 指到 `18d9a47`），到 `bc20985` 为止都在线上；修复以 `ebf3016` 提交并 push，第 3 次轮询（约 42s）Pages 内容与本地逐字节一致，再用 `.preview/live_pdf_pages.py` 在真站点上出了一次真纸（9 张 → 9 页，全程只 GET）。上一轮：图册版出图 + 占位页已 push 并复核，两条观感修复见「关键决策」第 9 条。
+最后更新：2026-09-22 傍晚（第三轮）。**补上了引擎层面的那只眼**：系统 WebKit（Safari 27 同一套引擎）第一次真出了纸。`.preview/safari-pdf` 加了 `--mode=paged`（一张纸一次 `createPDF(rect:)`），四种排法逐张出 PDF 再逐页对账：按周连排八周 9→9、按人成册两周 9→9、占位页 1→1、压到 66% 下限那例 1 张（纸面外 849px，Chromium 出 2 页）——**0 空白页、每页身份逐张对上、九张纸张张带图签栏**。`index.html` 一个字节没动（线上与 `ca91d40` 仍逐字节一致，本轮线上冒烟 9 张纸 / 60 张卡 / 0 条 console / 只有 1 条匿名 GET），产物是三张留档图加这两份文档。踩到三条通道自己的坑，写进「测量陷阱」第 16–18 条：`rect.y > 0` 会让 raster 丢掉纸面下沿（一度被误判成「WebKit 不画图签栏」）、WebKit 写出的 PDF 文本里汉字是康熙部首（`⽬` `⾏`），拿「页 / 行」做身份比对必然假失败、这台 Mac mini 一台打印机都没配，`NSPrintOperation(.save)` 因此走不通。**结论：Safari 打印面板的分页仍未证**，那一眼要真按一次 ⌘P 才算数（收件口见「怎么验证」）。上一轮：修掉一条分页缺陷并补齐留档三张，见「关键决策」第 10 条。
 
 ## 当前状态
 
@@ -10,11 +10,12 @@
 | --- | --- |
 | 线上版本 | `4df9d64`（= `origin/main`：分页修复 `ebf3016` + 留档三张 `cf4bacd` + 两份文档）。**第 3 次轮询（约 42s）内容与本地逐字节一致**：本地 `e6ae9cf35752ae4ca1727434928cf53c` / 172041 字节，前两次仍是上一版 `cbf55842…` / 171477 字节。独立证据两条：grep 部署产物，新规则 `#print-stack, body.sheet-preview #print-stack` 命中 1 处、旧的裸复位写法 0 处、注释里那句「第二张之后的纸静默消失」也在；再用 `.preview/live_pdf_pages.py` 拿**真站点 + 真云端数据**出一次纸——`?sheet&from=2026-W29&count=8&mode=weeks&toc=1` → 摘要「9 张 · A3 横排 · WTP-2026-W22–29」、60 张卡、DOM 9 张纸 → **PDF 9 页**、420×297mm、0 空白页、print 媒体下 `#print-stack` computed `static`，13 条请求全是 GET。这个比对口径每轮上线后都该做一次，命令见「怎么验证」 |
 | ⚠ 分页缺陷（已修上线） | 曾经线上从 `18d9a47` 起带的缺陷：只要纸铺在预览层里（点「预览 → 晒图」，或直接开 `?sheet` 直链），打印/另存 PDF 时**第一张之后的纸静默消失**——`body.sheet-preview #print-stack` 特异性压过了 `@media print` 的复位，容器到打印时仍是 `position:fixed` 的一屏。九张纸的册子只能出一张，屏上看不出任何异常；绕过预览层按 Cmd+P 反而正常。修复见 `ebf3016` 与「关键决策」第 10 条，上线证据见上一行 |
+| 引擎对账（WebKit 真机） | **一张纸一次**那条通道跑通了：`safari-pdf --mode=paged` 用系统 WebKit 把四种排法逐张出 PDF，DOM 纸数 → WebKit 页数 → Chromium 页数三账对齐（9/9/9、9/9/9、1/1/1、1/1/**2**），0 空白页，每页用 ASCII 图号认身份（`WTP-2026-W32`…）全部对号，九张纸的图签栏逐页用像素判据钉住（`safari_contact.py` 的 `band_state()`：离底 20–100px 之间有横向墨迹且通宽 ≥80%）。纸面 1512×1047 CSS px = 400×277mm，与 Chromium 那批 420×297mm 是同一张纸（差的是 `@page` 那 10mm 页边）。**这不等于 Safari 会分页**——见「关键决策」第 11 条 |
 | 数据 schema | v3（带 `tombstones`），可读 v1/v2 并自动升级 |
 | 云端数据 | 69 条任务，覆盖 2026-W21 … W29 |
 | 同步 | 已打通。一次真实 PATCH 验证过非破坏性（69→69，0 条增删，只有 `order` 字段补齐、`currentWeek` W29→W39） |
 | 出图 | 从「单张 A3 + 底部图签」升级为**图册**：按周连排或按人成册，1–8 周，可加图纸目录页，逐张配平缩放，零张纸时出「此页无图」占位页。**出纸已按真 PDF 数过页数**（四种排法 9/9/1/2 页，全部 A3 横排，0 空白页） |
-| 待办 | 版面留档**已补齐**（十四张 + `docs/sheet-facts.json` 九条读数）；分页修复已上线（真站点出纸 9→9 页复核过）；另外三位同事还没各自配 Token；真机 Safari/iOS 的打印没验过（详见文末「还欠着的」） |
+| 待办 | 版面留档**已补齐**（十七张 + `docs/sheet-facts.json` 九条读数）；分页修复已上线（真站点出纸 9→9 页复核过）；**WebKit 逐张出纸本轮已对账**（9/9/1 + 溢出那例纸面外 849px），剩 **Safari 打印面板的分页**（等真 ⌘P 那五份 PDF）和 iOS 真机没验过；另外三位同事还没各自配 Token（详见文末「还欠着的」） |
 
 ## 时间线
 
@@ -43,6 +44,7 @@
 | `2e0efe9` `88703e5` `4b3facb` | 2026-09-21 深夜 | **版面留档 + 两条观感修复**：`.preview/shoot.py`（无头 Chromium 出图留档，仓库外）拍六张进 `docs/screenshots/`，版面读数落 `docs/sheet-facts.json`；看图当场揪出「图签栏浮在纸中间」和「纸上印着编辑提示」，`index.html` 只加 12 行 CSS（`flex:1 1 auto` 贴下边线、`.placeholder` 隐藏 + `:has()` 补 `（未命名）`），**配平数字一位没变**。三份一起 push，Pages 第 2 次轮询（约 20s）即与本地一致 |
 | `bc20985` | 2026-09-21 深夜 | 只动文档：把「当前状态」从待办口径改成实际上线复核口径（第 2 次轮询即一致 + 真站点只读冒烟断言） |
 | `ebf3016` `cf4bacd` `4df9d64` | 2026-09-21 深夜 | **修掉一条分页缺陷**：`.preview/pdf_sheet.py` 把出图真跑成 PDF 数页数，发现四种排法全部只出 1 页——`body.sheet-preview #print-stack` 特异性压过 `@media print` 的复位，从预览层出纸时第一张之后的纸静默消失。`index.html` 只动那一条规则（+8/−3，其中 5 行是注释），修后 9→9、9→9、1→1、1→2 页、0 空白页；harness 侧两次改 `build.py`（补屏上复位 + print 复制收窄成 `@media screen`），九张留档图重跑后八张逐字节相同，第九张只换了目录页脚的生成时间。同时补齐留档三张（对话框 / 拖拽中 / 手机长版面）+ 纸面对比度审计（43/39/10 类文字，0 未达标，最紧 5.42:1）。三份一起 push，第 3 次轮询（约 42s）内容与本地一致，并用 `.preview/live_pdf_pages.py` 在真站点上出了一次真纸：**9 张 → 9 页** |
+| （本轮，未提交） | 2026-09-22 | **第一次让系统 WebKit 真出纸**：`.preview/safari_pdf.swift` 加 `--mode=paged`（一张纸一次 `createPDF(rect:)`）和 `--mode=rect`（手给 rect 做坐标实验），`safari_paged.py` 出四例逐张 PDF + `safari-paged-facts.json`，`safari_contact.py` 拼三张留档图并逐页判图签栏。账：9/9/9、9/9/9、1/1/1、1/1/2，0 空白页，逐页身份对上。中途一条假案（「WebKit 不画图签栏」）追到的是通道自己的 `rect.y>0` 掉下沿，垫空高后对齐到原点即全部齐；`index.html` 一个字节没动。Safari 打印面板的分页仍未证——这台机器零台打印机，`NSPrintOperation(.save)` 走不通，见「关键决策」第 11 条 |
 
 ## 关键决策与被推翻的假设
 
@@ -134,6 +136,24 @@ v2 的 merge 是「id 取并集 + `updatedAt` 新的赢」，这个语义下**�
 3. 它和第 8 条那句「空态不是错误态」、以及那个掩盖了两个月的「✓ 已同步」是**同一类失败**：没有异常、没有报错、界面上看着有内容，只有把最终产物数一遍才露馅。**判断规矩**：出纸这种「一份变 N 份」的东西，回归断言里必须有一个 N，而且要来自最终产物（页数），不是来自计划（`plan.sheets`）。计划本身也可以是对的而产物是错的——这次就是。
 
 修完的四案例对账（`.preview/out/pdf-facts.json`，口径是 `plan.sheets` → DOM `.sheet-paper` 数 → **PDF 页数**）：按周连排八周 8→9→9、按人成册两周 8→9→9（差的那 1 张是目录页，`plan.sheets` 从来不数它）、占位页 0→1→1、溢出那例 **1→1→2**——摘要说「出纸会续页」，真出了两页，这个承诺在真分页里兑现了。四种排法全部 420×297mm，0 张空白页。顺带量到一个待办：溢出那例的**续页上带着图签栏**（内容块整块往下流，图签栏跟着跑到第二页）——说明今天的是**溢出分页**，不是真正的**跨页续排**，见「还欠着的」第 4 条。
+
+### 11. 真机出纸：另开一条 WebKit 通道，但别把通道的构造当成结论
+
+第 10 条末尾说「唯一没验的是引擎」。Chromium 出 9 页不代表 Safari 出 9 页——出图依赖 `:has()`（Safari 15.4+）和浏览器自己的分页实现，这两样都是各引擎各自的。所以这轮的目标很单纯：**拿系统 WebKit 出一遍纸**。
+
+macOS 上能碰 WebKit 的三条路，只有一条半能用：
+
+1. `NSView.printOperation(with:) + .save`（Safari 打印面板背后那条，分页 / print 媒体 / `@page` 全走）——**这台机器一台打印机都没配**，`NSPrintOperation` 起不来，`.save` 也拿不到落盘口。这条路不是「没试好」，是环境就不通，别再在它上面耗时间（探针 `.preview/probe_printop.swift` 留着，重编一条 `swiftc -O` 就能复现）。
+2. `WKWebView.createPDF(configuration:)` 不给 rect——**恒 1 页**。这是 API 语义（它画的是「当前视口」），不是 Safari 打不出多页，别拿它当缺陷报。
+3. `--mode=paged`：**一张纸一次**，把那张 `.sheet-paper` 滚到视口原点，用它的盒子当 rect。它证明的是「WebKit 自己排的这张纸装得下、没裁、有内容」，**不证明 Safari 会不会把九张纸分成九页**——分页仍然只有真按 ⌘P 才算数。这条界限写在工具文件头，也写在每张留档图的页脚里，因为「WebKit 出了 9 页」这句话太容易被读成后者。
+
+跑出来的账（`.preview/out/safari-paged-facts.json`，口径 DOM 纸数 → WebKit 页数 → Chromium 页数）：`9/9/9`、`9/9/9`、`1/1/1`，溢出那例 `1/1/2`——WebKit 那张纸盒 998×1251，比视口高，量具只能截到 1200（图上明标「截掉 51px」），而它超出纸面 **849px**，跟 Chromium 分成两页是同一件事的两种说法。四例 **0 空白页**，每页用 ASCII 图号认身份（`WTP-2026-W32` … `W39`）逐页对上。
+
+中间一桩**假案**值得整条记下来：第 9 张纸的 raster 底下 109px 全白，图签栏整条没了，一度被写成「WebKit 不画图签栏」。DOM 站在 WebKit 自己那边：`.tb` 在 986..1029、`opacity:1`、`visibility:visible`、祖先链上没有裁剪；PDF 内容流里那九格的字也在。可 raster 就是没有。追下去是**量具的坐标语义**：`createPDF(rect:)` 的 `rect.y > 0` 时，写出来的页底部正好少掉 `y` 那么多像素——第 9 张停在 `y=109`，容器 `clientH=1200` 明明装得下（109+1047=1156），墨迹却只到 `938 = 1047 − 109`。修法是**让每张纸都能对齐到原点**：滚动容器尾部临时垫一个 1600px 空 div（不动任何一张纸自己的布局），`rect` 恒为 `(0,0,纸宽,纸高)`，对齐不到 1px 以内直接报错退出。
+
+**判断规矩**：换引擎出来的东西，先怀疑量具，但**怀疑的方式是给结论加一条能失败的判据**，不是口头保证。所以留档脚本里现在有 `band_state()`：逐页看「离底 20–100px 之间有没有横向墨迹、且通宽 ≥80%」，缺一条就 `sys.exit`，不再靠肉眼回看拼图。修完再跑，`weeks-8` 九页、`persons-2` 九页、`nil` 一页全 `ok`，只有那例按构造截断的标 `trunc`。
+
+留档的诚实性也交代清楚：三张拼图里**每个像素都来自 WebKit 写出的 PDF**（`pdf-render` 逐页画 PNG），拼图的壳是 Chromium 渲的；图注逐格写着字数、图号和截断情况，页脚写着这条通道是什么、能证明什么。真 ⌘P 那五份 PDF 的收件口是 `.preview/out/safari-manual/` + `safari_manual_intake.py`，到了就能直接补上分页那一眼。
 
 ## 怎么验证（离线 harness）
 
@@ -265,10 +285,13 @@ push 完在真站点上复核过三件事（全程只读，控制台零条消息
 13. **手机整页截图有两个坑，都是「只截到一屏」**。`#board` 自己是内层滚动容器（`overflow:auto`），文档高度并不包含超出的人列，`full_page:true` 拿到的仍是一屏——要注入 `html,body{height:auto;overflow:visible}` + `#board{flex:none;height:auto;overflow:visible}` 把内层滚动摊平（跟 `@media print` 对 `#print-stack` 做的事一模一样）。摊平之后又冒出第二个：`position:fixed` 的悬浮保存条在整页图里会**漂到页尾**盖住最后一列，所以留档注入 `.hide`，并在 facts 里写明这是拍摄装置、不是产品行为（产品上它本来就只在待存时出现）。
 14. **拖拽中的版面造不出来，除非你真的拖**。`dispatchEvent(new DragEvent(...))` 不会走 HTML5 拖拽那条原生链路，卡片的 `is-dragging` 姿态量不到。可行的是无头浏览器里发真指针：`mouse.move(卡的中心) → mouse.down()`，**先步进 10px 级别的小位移越过代码里那个 6px 拖拽阈值**，再步进到目标列，截图，最后 `mouse.up()` 收尾（别留一个拖到一半的状态给下一张图）。断言读 `getComputedStyle` 的 `transform` 矩阵与兄弟卡 `opacity`（本轮：被拖卡 `matrix(0.999962,-0.00872654,…)` 即抬起微旋，兄弟 `0.5`）。
 15. **量具会自己制造假阴性**。`.preview/build.py` 里把 `@media print` 抄到屏上的那段，复制出来的媒体块必须写 `@media screen`、harness 的复位规则也要包在 `@media screen{}` 里；写成 `@media all` 或裸规则，它在**打印媒体下同样成立**，`page.pdf()` 就又被按回 1 页——刚修好的分页缺陷被量具遮住，而旧 `pdf-facts.json` 里躺着改量具之前跑出的「9 页」，看着全绿。**规矩**：动过 harness 就把被测项重跑一遍，别引用上一轮的产物文件。
+16. **`WKWebView.createPDF(rect:)` 的 `rect.y > 0` 会把纸面下沿吃掉**，而且吃掉的量正好等于 `y`。第 9 张纸滚到 `y=109`（容器 `scrollTop` 已到上限），`clientH=1200` 明明装得下 109+1047，出的 raster 却只有前 938px = `1047 − 109` 有墨，图签栏整条不见了——DOM 说它画在 986..1029、`opacity:1`、无裁剪祖先，PDF 内容流里那九格的字也在，只有 raster 不认。**别拿这条当产品缺陷报**：它是量具的坐标语义。对策是垫空高让每张纸都对齐到 `y=0`（`rect` 恒为 `(0,0,w,h)`），并把「对齐不到 1px 以内」做成硬失败；另外加一条像素判据（离底 20–100px 有通宽墨迹）兜住，否则这类「少一条」只会靠肉眼发现。
+17. **WebKit 写进 PDF 的汉字是康熙部首码位**：`目`→`⽬`、`页`→`⾏` 那一类，`extract_text()` 出来的串跟 HTML 里的字**逐字符不等**。`unicodedata.normalize('NFKC')` 能修一部分，不是全部（`\u2f00` 段里有些码位 NFKC 不动）。所以「这一页是不是那张纸」的身份比对**只用 ASCII 键**（图号 `WTP-2026-W32`、张次 `SHT 07/09`），别拿中文标题做 `in` 判断——我第一版就是据此报出过一整批「标签错位」的假失败。
+18. **这台机器零台打印机，无头打印链路是死的**。`NSPrintOperation` 的 `view.printOperation(with:)` + `.save` + `NSPrintJobSavingURL` 是 Safari ⌘P 的等价物（分页、print 媒体、`@page` 全走），但它要先拿到一台配置好的打印机；`NSSharingService` / `cups` 加虚拟 PDF 打印机属于改系统配置，不在这一轮范围。**结论：Safari 的分页只能由人真按一次 ⌘P**，产物丢进 `.preview/out/safari-manual/` 再跑 `safari_manual_intake.py`。别写「检测到没打印机就自动降级成 `createPDF`」的看门狗——那会把两条链路混成一件事，见「关键决策」第 11 条。
 
 ## 版面留档（截图）
 
-`docs/screenshots/` 十四张，分三批。19:00 那批五张拍的是**看板**（日览 / 蓝图 / 修订表 / 手机 390），仍然有效；其中 `2026-09-21-print-sheet-a3.png` **已过期**（`744ccd2` 的旧 2×2 单张版面），只留着跟新出图图对照。22:00 那批六张是**图册版出图**。23:00 那批三张补齐了缺口：**晒图设置对话框、拖拽进行中、手机整页长版面**。
+`docs/screenshots/` 十七张，分四批。19:00 那批五张拍的是**看板**（日览 / 蓝图 / 修订表 / 手机 390），仍然有效；其中 `2026-09-21-print-sheet-a3.png` **已过期**（`744ccd2` 的旧 2×2 单张版面），只留着跟新出图图对照。22:00 那批六张是**图册版出图**。23:00 那批三张补齐了缺口：**晒图设置对话框、拖拽进行中、手机整页长版面**。2026-09-22 那批三张是**系统 WebKit 真出的纸**——同一批排法，另一个引擎，逐张拼图（见下面第四张表）。
 
 **图里的项目名是假的。** 板子上跑的是打码种子：`.preview/anonymize_seed.py` 把 `seed.json` 的 `name` / `notes` 换成「示例项目 A…U」「对接人 A…G」（长度尽量与原句相当，免得换行位置变了），真实客户名、分店地名、对接人姓名只存在于云端 Gist 和各自浏览器的 localStorage，不进仓库。备注里的纯工作描述（`第4稿`、`换场地`、`明档修改中`）不含客户信息，原样留着。
 
@@ -284,6 +307,14 @@ python3 .preview/verify_sheet.py                                     # 改 CSS �
 python3 .preview/pdf_sheet.py                                        # 真出纸：数 PDF 页数，见决策 10
 python3 .preview/ab_print_path.py                                    # A/B/C 对照：分页的因是不是那条 fixed
 python3 .preview/audit_sheet_contrast.py                             # 纸面文字逐类算对比度
+
+# —— 系统 WebKit 那条（2026-09-22 起）——
+swiftc -O .preview/safari_pdf.swift -o .preview/safari-pdf \
+  -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker .preview/safari_pdf-Info.plist
+swiftc -O .preview/pdf_render.swift -o .preview/pdf-render           # PDF → PNG（PDFKit）
+python3 .preview/safari_paged.py                                     # 四例逐张出 PDF + safari-paged-facts.json
+python3 .preview/safari_contact.py                                   # 拼三张留档图，顺带逐页判图签栏
+python3 .preview/safari_manual_intake.py                             # 真 ⌘P 的 PDF 落到 out/safari-manual/ 后跑它
 ```
 
 `shoot.py` 走的是无头 Chromium（Playwright，`chromium_headless_shell`），**不依赖 In-app Browser 面板在前台**——这是这轮换的手段，理由见「关键决策」第 9 条。它只打打码版：脚本开头有一句 `if "preview-anon" not in base: sys.exit(...)`，防止手滑拿真种子出图。重跑一次 `sheet-facts.json` 逐字节一致（版面读数确定），所以它是可以当回归用的。
@@ -313,6 +344,14 @@ python3 .preview/audit_sheet_contrast.py                             # 纸面文
 | ![board dragging](./docs/screenshots/2026-09-21-board-dragging.png) | **拖拽进行中**（CAD 选择集的读法）：`示例项目 P（旗舰店）` 正被拖进另一列，卡片抬起微旋（computed `matrix(0.999962,-0.00872654,…)`），同列兄弟淡到 `opacity:0.5`。真指针事件造的态，见「测量陷阱」第 14 条 |
 | ![mobile long](./docs/screenshots/2026-09-21-mobile-board-long.png) | **手机整页长版面** 390×2696：四条人列纵向堆叠（列顶 320 / 624 / 1240 / 2004）、11 张卡、统计条与页脚全在里面，`scrollWidth` 390 = 视口宽。悬浮保存条是拍摄装置注入隐藏的，产品上它只在待存时出现（「测量陷阱」第 13 条） |
 
+2026-09-22 那批三张——**同一批排法换系统 WebKit 出一遍**（打码种子，跑法见上面那条 WebKit 命令块）。每张图是一例排法的全部纸，逐格标了「第 NN 张 · 提取出的字数 · ASCII 图号 · 图签栏判定」，页脚写着这条通道证明什么、不证明什么：
+
+| 图 | 看什么 |
+| --- | --- |
+| ![webkit weeks8](./docs/screenshots/2026-09-22-webkit-suite-weeks8.png) | **按周连排八周 + 目录，WebKit 出 9 张**：DOM 9 张 → WebKit 9 页 → Chromium 9 页三账对齐，纸面 400.0×277.0mm（= 1512×1047 CSS px，与 Chromium 那批 420×297mm 差的就是 `@page` 那 10mm 页边），0 空白页、0 身份错位、0 盒内溢出，九张纸的图签栏逐格 `ok`。目录页中间那一大片白**两个引擎一样**：最大空白带按 Chromium 的 0.75 出纸比例换算后是 536px（Chromium）/ 539px（WebKit），第二张是 608 / 612 —— 索引表本来就短，图签栏照旧钉在纸的下边线，不是 WebKit 少画了东西 |
+| ![webkit persons2](./docs/screenshots/2026-09-22-webkit-suite-persons2.png) | **按人成册两周 + 目录，WebKit 出 9 张**：`WTP-2026-W38–39`，卷内页与 `VOL` 目录都在；这一例是「一个人一周 = 一卷、每卷纸数不等」那条路径，逐张同样装得下 |
+| ![webkit nil spill](./docs/screenshots/2026-09-22-webkit-nil-spill.png) | **左：占位页**（`此页无图`、图签栏图号是一段区间 `WTP-2019-W52 – WTP-2020-W01`、张次 `NIL`）——WebKit 画得出这一页，说明「零张纸也要有一张纸可打」那条决策跨引擎成立。**右：压到 66% 下限仍超纸面**那一张，纸盒 998×1251 比视口高，通道只截到 1200（图上明标截掉 51px），量到**纸面外 849px** —— 这就是「必须续页」的形状，Chromium 那边确实分成了 2 页 |
+
 拍摄时统一注入 `transition:none;animation:none`（理由见上面「测量陷阱」第 1 条）。每轮的版面数字（张数、每页卡数、自然高、`fc`、`spill`、摘要原文、纸面/条底色）随图落在 `docs/sheet-facts.json`，比逐张肉眼读图可靠；九条记录里 `net` 全 0、`stressLeft` 全 0（压力任务不会漏进留档）。**版面读数是确定的，图不是逐字节确定的**：本轮为修分页两次改过 `build.py`（先加 harness 复位、再把复制媒体从 `all` 收窄成 `screen`），每次重跑九张图，`sheet-facts.json` 一字未变，像素上唯一变化的是目录页脚那句生成时间（`22:15:41` → `23:00:57` → `23:17:25`，逐张比对用 `ImageChops.difference().getbbox()`）——这正好反过来证明两次量具改动都没动到屏上版面。
 
 **蓝图主题下纸面仍然是白的，这是设计不是 bug**：`#print-stack` 就地覆盖了一整套纸面令牌（打印机给不出深蓝底，屏上预览与出纸因此同一份观感）。实测：`theme=blueprint` 时预览条 `rgb(19,40,55)`、纸面 `rgb(255,255,255)`。**别去读 `body` 上的 `--paper-raised`**，它照样是 `#132837`，读了会以为图拍错了。
@@ -320,10 +359,11 @@ python3 .preview/audit_sheet_contrast.py                             # 纸面文
 
 ## 还欠着的
 
-1. **留档的缺口本轮已补齐**（对话框 / 拖拽中 / 手机长版面三张，见上面第三张表）。剩下的是**引擎层面的缺口**：所有版面证据都出自无头 Chromium（`chromium_headless_shell`），Safari / iOS 真机一次没跑过——而出图恰好依赖 `:has()`（Safari 15.4+）和浏览器自己的分页实现，Chromium 出 9 页不代表 Safari 出 9 页。真机验一次打印，是这批功能上线后最该补的一眼。
-2. **harness 的依赖没纳管**：`shoot.py` / `verify_sheet.py` / `pdf_sheet.py` / `audit_sheet_contrast.py` 要 `pip3 install --user playwright pypdf` + `python3 -m playwright install chromium`（约 120MB，装在 `~/Library/Caches/ms-playwright`）。`.preview/` 整个目录仍在仓库外，换机器要重建（本轮已经见过一次 iCloud 搬目录）。要不要纳管，用户明确说这轮先改功能。
-3. **团队配 Token**：另外三位同事各刷一次页面，然后各自在 ⚙ 设置里贴 Token 点「保存并同步」（每台浏览器单独配，Token 不共享）。
-4. 未排期的候选方向（四条轨道里「出图模式」这轮落地，剩下的）：
+1. **引擎缺口这轮补了一半**。WebKit（系统 WebKit，Safari 27 同一套）已经逐张出过纸并跟 Chromium 对完账（见「关键决策」第 11 条与那三张留档图），`:has()` 在 WebKit 下也是绿的（五种排法各跑一遍：5/5、1/1、0/0、0/0、3/3）。**还差两样**：① **Safari 打印面板的分页**——这台机器零打印机，无头那条路是死的（「测量陷阱」第 18 条），只能由人真按一次 ⌘P → 「存储为 PDF」，五份产物丢进 `.preview/out/safari-manual/` 再跑 `safari_manual_intake.py`；② **iOS 真机**一次没跑过，手机上看板那条已经用 390×844 同源 iframe 量过，出图那条只有纸面尺寸推导，没有真机证据。
+2. **纸上印着「REV / 新增」这件事要用户拍板**（本轮数出来的，不是猜的）：线上那份九张纸的册子里，`7` 个光板 `REV` 徽标加 `21` 个 `新增` 虚线框一起印在纸上，而**这 69 条任务的历史记录全是空的**——`delta` 是跨周实时比出来的（`_deltaMap` / `DELTA_FIELDS`，不落盘），本周内没编辑过就写「跨周变更，本周内暂无编辑」。屏幕上看这两个标记是「这条有故事」，晒到图上就成了「上周动过、这周又动过」，而修订表展开是空的。三条路：纸上整条不印（屏上保留）、只印 `新增` 不印裸 `REV`、或给 `REV` 补一个「跨周变化了什么」的最小摘要。**没定之前不动代码**，因为这条是观感判断不是缺陷。
+3. **harness 的依赖没纳管**：`shoot.py` / `verify_sheet.py` / `pdf_sheet.py` / `audit_sheet_contrast.py` 要 `pip3 install --user playwright pypdf` + `python3 -m playwright install chromium`（约 120MB，装在 `~/Library/Caches/ms-playwright`）；WebKit 那条还要 CLT 的 `swiftc -O` 编两个工具（`safari-pdf` / `pdf-render`，SDK 27 那套冲突见内存里的硬件备忘）。`.preview/` 整个目录仍在仓库外，换机器要重建（本轮已经见过一次 iCloud 搬目录）。要不要纳管，用户明确说这轮先改功能。
+4. **团队配 Token**：另外三位同事各刷一次页面，然后各自在 ⚙ 设置里贴 Token 点「保存并同步」（每台浏览器单独配，Token 不共享）。
+5. 未排期的候选方向（四条轨道里「出图模式」这轮落地，剩下的）：
    - 负荷条只有任务数，没有工时维度；
    - 修订表按任务卡展开，还没有按周汇总的全局修订页；
    - 配平只到「提示续页」，没有真正的**跨页续排**。本轮真出 PDF 量到了今天的行为：33 项那一例确实出了两页（承诺兑现），但那是**内容块整体往下流的溢出分页**——第二页上是剩余卡片 **加整块图签栏**，页眉也没有 `SHT 03/13 (续)` 这种张次。真正的续排要把同一人列按卡拆开、每页都带页眉与图签、张次标 `(续)`，并且拆出来的两页仍要各自配平；
