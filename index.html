@@ -1852,14 +1852,16 @@ const DataModel = {
   },
 
   // 一条任务在这一周的跨周读数：
-  //   streak = 含本周在内、连续在册的周数（1 == 上一周没有 == 「新增」那同一件事）
-  //   delta  = 'new' | 'rev' | ''
+  //   streak  = 含本周在内、连续在册的周数（1 == 上一周没有 == 「新增」那同一件事）
+  //   earlier = 这一段**起点之前**还有几周在册（> 0 就是「断过之后重开的」）
+  //   delta   = 'new' | 'rev' | ''
   // 只往回看不往前看：读数与「这次出图排了几周」「看板停在第几周」都无关，
-  // 所以同一周的同一张卡，屏上那张与纸上那张量到的是同一个数。
+  // 所以同一周的同一张卡，屏上那张与纸上那张量到的是同一个数。earlier 也守这条：
+  // 它数的是比本周更早的周，本周之后又排了几周不会改它。
   // 60 是防死循环的保险，不是量程（真实数据里最长的一条连续挂在 6 周）。
   taskMarks(task, ctx) {
     const c = ctx || this.tenureCtx();
-    const out = { streak: 0, delta: '' };
+    const out = { streak: 0, earlier: 0, delta: '' };
     const o = this.weekOrdinal(task.week);
     if (o === null) return out;
     const k = this.weekKey(task);
@@ -1868,6 +1870,14 @@ const DataModel = {
     let n = 1;
     while (n < 60 && s.has(o - n)) n++;
     out.streak = n;
+    // 起点（o - n + 1）的前一格必定不在集合里 —— 上面那个 while 就是在那一格停下的，
+    // 所以「更早还有周」与「中间断过」是同一件事，不用另外找断点。
+    // 保险烧掉时（n 撞到 60）那一格**可能**还在集合里，这时「断过」会读成假话，
+    // 所以宁可少说：这一段之外一律不计。
+    if (n < 60) {
+      const first = o - n + 1;
+      s.forEach(m => { if (m < first) out.earlier++; });
+    }
     if (!s.has(o - 1)) out.delta = 'new';
     else if (c.sig.get(k + '\u241f' + (o - 1)) !== this._deltaSig(task)) out.delta = 'rev';
     return out;
@@ -2106,20 +2116,24 @@ const Renderer = {
   // 卡右上角那两枚跨周徽标的全部输入，一整个星期一次算清：
   //   delta  = Map<weekKey, 'new' | 'rev'>  与上一周比：本周没有的算新增，定义字段变了的算修订
   //   streak = Map<weekKey, n>              这条连续在册到第几周（1 = 上一周没有）
+  //   broken = Map<weekKey, m>              这一段之前还断续排过几周（0 = 头一遭，没断过）
   // 进度和状态不计入 delta —— 那是这张表要跟踪的内容，不是任务的修订。
   // 两个读数摊在同一次 tenureCtx 上（见 DataModel.taskMarks），所以「没有上一周」
   // 与「第 1 周」是同一句话，不会一枚徽标说没有、另一枚说有。
   // （2026-09-23 之前这里只有一个 `_weekDelta`，返回的就是上面那个 delta Map。）
+  // broken 是第十轮添的：`第 2 周` 那枚徽标只说「连着第几周」，断过之后重开的那一条
+  // 与一直连着的读出来一模一样，而这件事当时只有点开卡片或看横表才知道。
   _weekMarks(weekStr) {
     const ctx = DataModel.tenureCtx();
-    const delta = new Map(), streak = new Map();
+    const delta = new Map(), streak = new Map(), broken = new Map();
     DataModel.state.tasks.forEach(t => {
       if (t.week !== weekStr) return;
       const m = DataModel.taskMarks(t, ctx);
       if (m.delta) delta.set(DataModel.weekKey(t), m.delta);
       streak.set(DataModel.weekKey(t), m.streak);
+      broken.set(DataModel.weekKey(t), m.earlier);
     });
-    return { delta, streak };
+    return { delta, streak, broken };
   },
 
   // 最近 8 周（含本周）每人接了多少项，纯本地计数
@@ -2190,6 +2204,7 @@ const Renderer = {
     const key = DataModel.weekKey(task);
     const delta = (marks && marks.delta && marks.delta.get(key)) || '';
     const streak = (marks && marks.streak && marks.streak.get(key)) || 0;
+    const earlier = (marks && marks.broken && marks.broken.get(key)) || 0;
     const cls = 'task-card'
       + (delta === 'new' ? ' is-new' : '')
       + (this.openRevs.has(task.id) ? ' rev-open' : '');
@@ -2215,7 +2230,7 @@ const Renderer = {
           <em aria-hidden="true">—</em>
           <span class="date-range editable" data-field="dueDate" title="结束日期">${this._formatSingleDate(task.dueDate)}</span>
         </span>
-        <span class="rev-slot">${this._revChips({ hist: hist.length, delta, streak, status: task.status })}</span>
+        <span class="rev-slot">${this._revChips({ hist: hist.length, delta, streak, earlier, status: task.status })}</span>
       </div>
       <div class="card-row">
         <span class="notes editable" data-field="notes">${notes}</span>
@@ -2229,13 +2244,25 @@ const Renderer = {
   // 传错顺序不会报错、只会少画一枚徽标（`_tocMatrix` 那个 isSum 就是这么被抓出来的）。
   //   第 N 周 —— streak > 1 才印，第 1 周就是「上一周没有」，那件事虚线云线 + `新增` 已经说了；
   //             已完成的也不再印：这张表跟踪的是还欠着的，纸上要一眼看出谁挂了四周。
+  //   断后第 N 周 —— 第十轮：earlier > 0 时在前面加两个字。断过之后重开的「第 2 周」
+  //             与一直连着的「第 2 周」原来在纸上是同一句话（fixture 里 TB 那五周就是
+  //             「不印 → 第 2 周 →（断一周）→ 新增 → 第 2 周」），而这一格要说的是
+  //             **这一段之前它还排过**，不是这一段有多长 —— 所以只在前面加记号、
+  //             不把周数改成「第 2/4 周」那种带分母的写法（那会被读成「一个四周的活」，
+  //             而真相是「断过、重开到第 2 周」）。代价先量过：行高钉在 15px 一动不动，
+  //             横向 +19.1px 吃的是槽与日期之间那一段留白（三例里最紧的一枚还剩
+  //             127.4px），43 枚徽标逐一对上：**折行 0 张、行内溢出增量 0px**
+  //             （`.preview/probe_r10_broken.py`，槽是右对齐的，加宽只往左吃留白）。
   //   新增 / REV —— 口径与改动前一字不动（决策待定：纸上到底印不印这两枚，见「还欠着的」）。
   _revChips(o) {
     const n = o.hist || 0;
+    const e = o.earlier || 0;
     let h = '';
     if (o.streak > 1 && o.status !== '已完成') {
       h += `<span class="chip ten${o.streak >= 4 ? ' long' : ''}"`
-        + ` title="同一人同名连续在册 ${o.streak} 周（含本周）">第 ${o.streak} 周</span>`;
+        + ` title="同一人同名连续在册 ${o.streak} 周（含本周）`
+        + (e ? `；这一段之前它还断续排过 ${e} 周，这一轮是断过之后重开的` : '')
+        + `">${e ? '断后' : ''}第 ${o.streak} 周</span>`;
     }
     if (o.delta === 'new') h += '<span class="chip new" title="上一周没有这条任务">新增</span>';
     if (n || o.delta === 'rev') {
@@ -2344,7 +2371,7 @@ const Renderer = {
     const m = DataModel.taskMarks(task);
     card.classList.toggle('is-new', m.delta === 'new');
     const slot = card.querySelector('.rev-slot');
-    if (slot) slot.innerHTML = this._revChips({ hist: hist.length, delta: m.delta, streak: m.streak, status: task.status });
+    if (slot) slot.innerHTML = this._revChips({ hist: hist.length, delta: m.delta, streak: m.streak, earlier: m.earlier, status: task.status });
     const table = card.querySelector('.rev-table');
     if (table) table.outerHTML = this._revTable(hist);
   },
@@ -2928,14 +2955,24 @@ const SheetSet = {
     // 数的是**卡**不是**身份**：同一条在两张纸上就记两次 —— 与上面那句
     // 「同一条任务在相邻两周各记一次」同一口径，换成去重这两句会互相打脸。
     const tctx = DataModel.tenureCtx();
-    let stuck = 0, longest = 0;
+    let stuck = 0, longest = 0, resum = 0, longestBroken = false;
     all.forEach(t => {
       if (t.status === '已完成') return;
-      const n = DataModel.taskMarks(t, tctx).streak;
-      if (n > 1) { stuck++; longest = Math.max(longest, n); }
+      const mk = DataModel.taskMarks(t, tctx);
+      if (mk.streak > 1) {
+        stuck++;
+        // 「最长的一项在纸上印着「X」」引用的是**纸面上那串字**，所以那一档断没断
+        // 也得跟着走：若并列最长的几枚里有一枚没断，纸上就真有「第 K 周」那串字，
+        // 引号里就不该带「断后」；只有它们**全**断过时，那串字才是「断后第 K 周」。
+        if (mk.streak > longest) { longest = mk.streak; longestBroken = mk.earlier > 0; }
+        else if (mk.streak === longest) longestBroken = longestBroken && mk.earlier > 0;
+        if (mk.earlier > 0) resum++;      // 纸上印「断后第 N 周」的那几枚，同一个判据
+      }
     });
     const stuckNote = stuck
-      ? `未完成里 ${stuck} 项已连续在册到第 2 周以上，最长的一项在纸上印着「第 ${longest} 周」。`
+      ? `未完成里 ${stuck} 项已连续在册到第 2 周以上，最长的一项在纸上印着「${longestBroken ? '断后' : ''}第 ${longest} 周」`
+        + (resum ? `；其中 ${resum} 项印的是「断后第 N 周」—— 那几条断过一周以上，这一轮是重开之后数到的` : '')
+        + `。`
       : `未完成里没有一条排到第 2 周。`;
     const scope = { all: '全部任务', open: '只出未完成', filtered: '沿用看板当前筛选' }[cfg.scope];
     // 卷内那句跟着页眉的**同一道闸**（`volumes.length > 1`）：只有一卷时纸上压根不印
