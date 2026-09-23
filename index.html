@@ -914,11 +914,14 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
    所以纸面永远按 1512 宽排版，屏上只做等比缩小 —— 所见即所出，
    不会出现「屏上两列、纸上三列」这种对不上的预览。
    --fv（屏上适配窗口宽的缩放）由 JS 写进 #print-stack：CSS calc 除不出
-   无单位的比值（长度除以长度不合法），只能这么绕。打印时 --fit 只认 --fc。 */
+   无单位的比值（长度除以长度不合法），只能这么绕。打印时 --pvs 摁回 1。
+   配平（--fc）从第九轮起**只吃图面**：页眉 / 统计条 / 图签栏是图纸的图框，
+   永远按 100% 出；装不下时缩的是中间那块图面（见 .sheet-page > 图面块 那条
+   与 SheetSet.fit()）。所以纸盒的宽与高只跟 --pvs 走，跟 --fc 无关。 */
 .sheet-paper {
-  --fit: calc(var(--fv, 1) * var(--fc, 1));
-  width: calc(1512px * var(--fit));
-  height: calc(var(--nat, 1047px) * var(--fit));
+  --pvs: var(--fv, 1);
+  width: calc(1512px * var(--pvs));
+  height: calc(var(--nat, 1047px) * var(--pvs));
   margin: 0 auto 22px;
   background: var(--paper-raised); color: var(--ink);
   border: 1px solid var(--hair-strong);
@@ -929,13 +932,17 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
   display: flex; flex-direction: column;
   width: 1512px; min-height: 1047px;
   padding: 22px 26px 18px;
-  transform-origin: 0 0; transform: scale(var(--fit));
+  transform-origin: 0 0; transform: scale(var(--pvs));
 }
-/* 图签栏钉在纸的下边线：让图面自己吃掉剩余高度，而不是把空白留在纸尾。
-   留白在图框里是「这周就这么点活」，留在纸尾像没排版。
-   图签栏自己的 margin-top: 6mm 就是最小间距，装不下时也不会贴住最后一张卡。 */
+/* 图面块：配平只缩它。transform 不改变占位，所以 fit() 会把缩放后的高度差
+   用图签栏的负 margin 补回来（否则图签栏挂在纸尾下面）；宽度按 100%/fc 重排
+   再缩回满幅 —— 量过（probe_r9_width.py）：加宽之后高度一个像素都不变、
+   28/24 个任务名一个也没重排，所以这一步只买「格子跟图框对齐」，不偷高度。 */
 .sheet-page > .sheet-board, .sheet-page > .sheet-flow,
-.sheet-page > .sheet-nil, .sheet-page > .toc { flex: 1 1 auto; }
+.sheet-page > .sheet-nil, .sheet-page > .toc {
+  flex: 1 1 auto;
+  transform: scale(var(--fc, 1)); transform-origin: 0 0;
+}
 /* 压到下限还是装不下 —— 预览里标出来，别等打印机吐出两张才发现 */
 .sheet-paper.is-spill { outline: 1px dashed var(--rust); outline-offset: 3px; }
 /* 量尺寸用的探针纸（SheetSet._probe）。负 left 不撑出横向滚动条，
@@ -977,7 +984,10 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
 .sheet-flow.sparse { column-count: 2; }
 .sheet-flow .task-card { break-inside: avoid; display: block; margin-bottom: 4mm; }
 
-/* 图签栏（每页一条） */
+/* 图签栏（每页一条）。钉在纸的下边线：没被配平压的时候，是图面块的 flex-grow
+   把剩余高度吃掉、把它顶到纸尾；被压的时候由 fit() 写一条负 margin-top 把它
+   提回「图面视觉底边 + 6mm」—— 6mm 是最小间距，装不下时也不会贴住最后一张卡。
+   留白在图框里是「这周就这么点活」，留在纸尾像没排版。 */
 .tb { display: flex; flex-wrap: wrap; margin-top: 6mm; border: 1px solid var(--ink); }
 .tb-cell {
   display: flex; flex-direction: column; gap: 3px;
@@ -1113,11 +1123,12 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
     display: block !important; position: static !important; inset: auto !important;
     overflow: visible !important; background: #fff; padding: 0 !important;
   }
-  /* 屏上的纸边、投影与留白是给眼睛的；出纸只保留分页与配平缩放。
-     纸盒尺寸依旧按 --fit 算 —— transform 不改变占位，盒高要跟缩放后的
-     画面对上，否则会「画只占一张纸、盒子占两张纸」平白多吐一张白纸。 */
+  /* 屏上的纸边、投影与留白是给眼睛的；出纸只保留分页与图面配平。
+     纸盒尺寸只跟 --pvs 走，而打印时 --pvs 摁回 1 —— 纸永远是满幅的 1512×1047，
+     缩的只有图面那块（--fc），图框（页眉/统计条/图签栏）出纸时是 100%。
+     盒高要跟 --nat 对上，否则会「画只占一张纸、盒子占两张纸」平白多吐一张白纸。 */
   .sheet-paper {
-    --fit: var(--fc, 1);
+    --pvs: 1;
     margin: 0; border: none; box-shadow: none; outline: none;
     break-after: page; page-break-after: always;
   }
@@ -2435,9 +2446,39 @@ const SheetSet = {
   // 旧办法是让内容整块往下流：图签栏跟着跑到第二页、页眉上也没有「续」。
   // 现在按「一张卡」为最小单位开刀，每一半都是**完整的一张纸** ——
   // 自己的页眉、自己的图签、自己的配平。切多页就照着重开一遍，直到装得下。
-  // 判据用「配平下限能吞下的最大自然高」（1047 ÷ 0.66 ≈ 1586px）：
+  // 判据是「这张纸的自然高还装不装得下」。第九轮起图框不吃配平，这个上限就
+  // 不再是一个常数：图面在下限 FIT_FLOOR 处最多能吃 (1046 − PAD − F)/FIT_FLOOR，
+  // 加上图框 F 与上下内边距 PAD 才是整张纸的自然高上限（旧算法是 1047÷0.66≈1586，
+  // 那是按「整张等比缩」推的；图框一钉住它就必须跟着图框高走，否则切点会错 ——
+  // probe_r9_look.py 量过：不重推的话图签栏会掉到纸外 35px）。
   // 切完之后每张纸通常能回到 100%，而不是继续挤在 66% 上。
-  BUDGET() { return Math.floor(this.A3_H / this.FIT_FLOOR); },
+  FRAME_SEL: ':scope > .sheet-head, :scope > .stat-bar, :scope > .tb',
+  FLOW_SEL: ':scope > .sheet-board, :scope > .sheet-flow, :scope > .sheet-nil, :scope > .toc',
+  // 这张纸「压到下限还能吃多高的自然内容」= PAD + 图框 F + floor(avail / 下限)。
+  // 图框一钉住，这个上限就不再是常数（目录页没有统计条，比周页高 42px 的余量）。
+  // 量之前必须把 fit() 写过的两处内联样式摘掉：图签栏上挂着负 margin（补图面缩掉的
+  // 那截），图面上挂着 100%/fc 的宽。带着它们量，图框高会被负 margin 抵消掉 ——
+  // verify_framescale.py 头一跑就量出「每人+3 那例预算 1461 变 1663」，
+  // 整整多出 200px，切点会晚切一整列卡。摘完量完原样还原，调用方看不出差别。
+  _budgetFor(page) {
+    const cs = getComputedStyle(page);
+    const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const flow = page.querySelector(this.FLOW_SEL);
+    const tb = page.querySelector(':scope > .tb');
+    const keep = { w: flow ? flow.style.width : null, m: tb ? tb.style.marginTop : null };
+    if (flow) flow.style.width = '';
+    if (tb) tb.style.marginTop = '';
+    let frame = 0;
+    page.querySelectorAll(this.FRAME_SEL).forEach(el => {
+      const c = getComputedStyle(el);
+      frame += el.getBoundingClientRect().height
+        + parseFloat(c.marginTop) + parseFloat(c.marginBottom);
+    });
+    if (flow) flow.style.width = keep.w;
+    if (tb) tb.style.marginTop = keep.m;
+    const avail = (this.A3_H - 1) - pad - frame;
+    return pad + frame + Math.floor(avail / this.FIT_FLOOR);
+  },
 
   // 探针：一张看不见、但走同一套 CSS 与渲染器的纸。量它才算数 ——
   // 报纸分栏（.sheet-flow）的配平是排版引擎的事，在 JS 里模拟必然出错。
@@ -2455,7 +2496,8 @@ const SheetSet = {
   },
 
   _probeFits(html) {
-    return this._probe(html).scrollHeight <= this.BUDGET();
+    const page = this._probe(html);
+    return page.scrollHeight <= this._budgetFor(page);
   },
 
   // 量完就把探针摘掉：它带的也是 .sheet-paper，留在 DOM 里会让任何
@@ -2466,7 +2508,8 @@ const SheetSet = {
   },
 
   // 整张铺进探针，量两样东西：整张的自然高，以及每个竖排单元里每张卡的底边
-  // （都是纸内自然像素 —— 探针的 --fit 恒为 1，rect 不会被缩放骗掉）。
+  // （都是纸内自然像素 —— 探针挂在 body 下、不在 #print-stack 里，--fv 传不进来，
+  // 所以 --pvs 与 --fc 恒为 1，rect 不会被缩放骗掉）。
   // 「这一页能画到哪儿」= limit = 下限能吞下的自然高 − 最高那列最后一张卡以下的占位。
   _sheetGeom(html, itemSel) {
     const page = this._probe(html);
@@ -2487,7 +2530,9 @@ const SheetSet = {
     const H = page.scrollHeight;
     const tops = groups.filter(b => b.length).map(b => b[b.length - 1]);
     const tail = tops.length ? H - Math.max.apply(null, tops) : 0;
-    return { h: H, limit: this.BUDGET() - tail, groups };
+    // 上限跟着这张探针纸自己的图框高走（目录页没有统计条，比周页矮 81px）
+    const budget = this._budgetFor(page);
+    return { h: H, budget, limit: budget - tail, groups };
   },
 
   // 竖排堆叠的列（按周连排的四列、目录页的表体）：一页里每列各自吃到装不下为止，
@@ -2531,7 +2576,6 @@ const SheetSet = {
   // 排一次册：逻辑页 → 物理纸张。每张纸带 pos（装订位置）、cont/conts（本图第几页）。
   _paginate(plan, cfg) {
     const papers = [];
-    const BUDGET = this.BUDGET();
     if (plan.withToc) {
       const idx = plan.sheets.map((s, i) => i);
       // 试排时就把「本图第 n/m 页」那格预留出来：续排标记会让图签栏那行字变长，
@@ -2541,7 +2585,7 @@ const SheetSet = {
         // 必须限定 `toc-index`：目录页现在有两张表，裸 `.toc table tbody > tr` 会把
         // 任务分布横表那五行也当成目录行切一刀 —— 切分对象错了，段数和卡数全乱。
         '.toc table.toc-index tbody > tr');
-      if (g.h <= BUDGET || !g.groups.length) papers.push({ kind: 'toc', rows: idx });
+      if (g.h <= g.budget || !g.groups.length) papers.push({ kind: 'toc', rows: idx });
       else {
         let c = 0;
         this._sliceGroups(g.groups, g.limit).forEach(take => {
@@ -2556,7 +2600,7 @@ const SheetSet = {
         const cols = C.MEMBERS.map(p => this.tasksFor(s.week, p, cfg));
         const g = this._sheetGeom(this._weekSheet(s, plan, cfg, Object.assign({ cols }, draft)),
           '.sheet-board .column-body > .task-card');
-        if (g.h <= BUDGET) { papers.push({ kind: 'week', sheet: s, cols }); return; }
+        if (g.h <= g.budget) { papers.push({ kind: 'week', sheet: s, cols }); return; }
         const cur = cols.map(() => 0);
         this._sliceGroups(g.groups, g.limit).forEach(take => {
           papers.push({ kind: 'week', sheet: s,
@@ -2567,8 +2611,11 @@ const SheetSet = {
       }
       const htmlOf = (from, n) => this._personSheet(s, plan, cfg,
         Object.assign({ tasks: s.tasks.slice(from, from + n) }, draft));
-      const whole = this._probe(htmlOf(0, s.tasks.length)).scrollHeight;
-      if (whole <= BUDGET) { papers.push({ kind: 'person', sheet: s, tasks: s.tasks }); return; }
+      const wholePage = this._probe(htmlOf(0, s.tasks.length));
+      const whole = wholePage.scrollHeight;
+      if (whole <= this._budgetFor(wholePage)) {
+        papers.push({ kind: 'person', sheet: s, tasks: s.tasks }); return;
+      }
       this._sliceFlow(s.tasks, htmlOf).forEach(([a, b]) =>
         papers.push({ kind: 'person', sheet: s, tasks: s.tasks.slice(a, b) }));
     });
@@ -3026,9 +3073,13 @@ const SheetSet = {
     return plan;
   },
 
-  // 配平：纸面按 1512 宽排版后量自然高度，缩到装得进 A3 短边。
-  // transform 不改变盒子占位，所以纸的占位高度要自己写回 --nat，否则纸叠纸。
-  // 压到 FIT_FLOOR 就不再压 —— 宁可让它续一张纸，也不印出读不得的小字。
+  // 配平：图框（页眉 / 统计条 / 图签栏）永远 100%，装不下时只缩中间那块图面。
+  // 量法必须「先回到自然尺寸再量」：--fc 是上一遍写进去的，不摁回 1 就量到缩放后
+  // 的版面，fc 会一遍比一遍小（反馈环）。图面按 100%/fc 重排再缩回满幅，
+  // transform 不改占位，所以占位高还是布局盒高 —— 差出来那截用图签栏的负 margin
+  // 提回来，提完「图面视觉底边 → 图签栏」正好还是那 6mm。
+  // 压到 FIT_FLOOR 就不再压 —— 宁可让它续一张纸，也不印出读不得的小字；
+  // 续不续由 _paginate 拿 _budgetFor() 判，那里和这里用的是同一条公式。
   A3_H: 1047,
   FIT_FLOOR: .66,
   fit() {
@@ -3044,19 +3095,60 @@ const SheetSet = {
       document.body.classList.remove('sheet-preview');   // 走到这儿 borrow 必为真
       return { worst: 1, spill: 0, skipped: true };
     }
+    const fv = parseFloat(getComputedStyle(stack).getPropertyValue('--fv')) || 1;
     let worst = 1, spill = 0;
     document.querySelectorAll('#print-stack .sheet-paper').forEach(paper => {
       const page = paper.querySelector('.sheet-page');
-      const h = page.scrollHeight;
-      // 装不下的那张按 H−1 配平、并且**向下截断**到四位小数：
-      // 四舍五入会把盒子顶到 1047.03px，而可印区只有 1046.9px —— 多出那零点
-      // 三像素足以让出纸机多吐一张空白续页（2026-09-22 在续排用例上真出过）。
-      const fc = h > H ? Math.max(this.FIT_FLOOR, Math.floor((H - 1) / h * 1e4) / 1e4) : 1;
+      const flow = page.querySelector(this.FLOW_SEL);
+      const tb = page.querySelector(':scope > .tb');
+      paper.style.setProperty('--fc', '1');
+      if (flow) flow.style.width = '';
+      if (tb) tb.style.marginTop = '';
+      const cs = getComputedStyle(page);
+      const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      let frame = 0;
+      page.querySelectorAll(this.FRAME_SEL).forEach(el => {
+        const c = getComputedStyle(el);
+        frame += el.getBoundingClientRect().height / fv
+          + parseFloat(c.marginTop) + parseFloat(c.marginBottom);
+      });
+      let fc = 1;
+      if (flow) {
+        const keepFlex = flow.style.flex;
+        flow.style.flex = '0 0 auto';      // 摘掉 grow，量的才是图面内容的自然高
+        const f = flow.getBoundingClientRect().height / fv;
+        flow.style.flex = keepFlex;
+        const avail = (H - 1) - pad - frame;
+        // 装不下的那张按 H−1 配平、并且**向下截断**到四位小数：
+        // 四舍五入会把盒子顶到 1047.03px，而可印区只有 1046.9px —— 多出那零点
+        // 三像素足以让出纸机多吐一张空白续页（2026-09-22 在续排用例上真出过）。
+        fc = f > avail ? Math.max(this.FIT_FLOOR, Math.floor(avail / f * 1e4) / 1e4) : 1;
+      }
       paper.style.setProperty('--fc', fc.toFixed(4));
-      paper.style.setProperty('--nat', Math.max(H, h) + 'px');
-      paper.classList.toggle('is-spill', h * fc > H + 1);
+      if (flow) {
+        flow.style.width = (100 / fc) + '%';
+        const layoutH = flow.getBoundingClientRect().height / (fv * fc);
+        const gap = layoutH * (1 - fc);
+        tb.style.marginTop = gap > .5 ? 'calc(6mm - ' + gap.toFixed(2) + 'px)' : '';
+      }
+      // 这张纸的图到底画到哪儿：**数子元素的 rect 底边**，不认 scrollHeight。
+      // scrollHeight 认不认「被 transform 缩小的图面」是各家引擎自己的事 —— Chromium 认，
+      // 于是这里正好 1047；哪天某家不认，它会把没缩的布局盒（图面的自然高）算进去，
+      // --nat 跟着虚高几十上百像素，出纸机就多吐一张空白续页（Safari 才是真出纸的那家，
+      // 不能只在 Chromium 上对）。rect 在哪家都是缩放后的真底边，所以拿它算。
+      const pr = page.getBoundingClientRect();
+      let bot = 0;
+      page.querySelectorAll(':scope > *').forEach(el => {
+        bot = Math.max(bot, (el.getBoundingClientRect().bottom - pr.top) / fv);
+      });
+      const h = bot + parseFloat(cs.paddingBottom);
+      // 纸的占位高度要自己写回 --nat，否则纸叠纸（transform 不改变盒子占位）。
+      // 真装不下的那张（压到下限还超）就让它比 1047 高：宁可让出纸机续一张，
+      // 也不把图签栏裁掉 —— is-spill 同时标出来，_paginate 下一遍会正式切开。
+      paper.style.setProperty('--nat', Math.max(H, Math.ceil(h)) + 'px');
+      paper.classList.toggle('is-spill', h > H + 1);
       worst = Math.min(worst, fc);
-      if (h * fc > H + 1) spill++;
+      if (h > H + 1) spill++;
     });
     // 借来的预览态必须在这里还掉，否则非预览页会被它自己塞的 class 留在预览样式里。
     if (borrow) document.body.classList.remove('sheet-preview');
@@ -3066,7 +3158,7 @@ const SheetSet = {
   },
 
   // 屏上适配：整叠纸按窗口宽等比缩小。这个值只影响预览，不参与出纸
-  // （@media print 里的 --fit 只认 --fc），所以 1512 基准与纸面一一对应。
+  // （@media print 里 --pvs 被钉回 1，配平只剩 --fc），所以 1512 基准与纸面一一对应。
   viewFit() {
     const w = Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth);
     const fv = Math.max(.2, Math.min(1, (w - 44) / 1512));
@@ -3140,7 +3232,7 @@ const SheetSet = {
       const extra = plan.total - (plan.sheets.length + (plan.withToc ? 1 : 0));
       bits.push(`续排 ${split.length} 张 → ${split.length + extra} 张`);
     }
-    if (this.minFit != null && this.minFit < .999) bits.push(`配平 ${Math.round(this.minFit * 100)}%`);
+    if (this.minFit != null && this.minFit < .999) bits.push(`图面配平 ${Math.round(this.minFit * 100)}%`);
     if (this.spillPages) bits.push(`${this.spillPages} 张压到下限仍超纸面 · 出纸会续页`);
     return bits.join(' · ');
   },
@@ -3249,9 +3341,10 @@ const SheetSet = {
     window.addEventListener('beforeprint', () => {
       if (!document.getElementById('print-stack').children.length) { this.build(); return; }
       // 已经有纸面：光重新配平一次不够。字体后落地、窗口变宽导致换行、或者用户在
-      // 预览里改过任务，都可能让某张纸高出 1586px 的下限预算 —— 这时压到 66% 只是
-      // 把墨迹硬塞回纸面，出纸机照旧多吐一张没图签的续页。该重排一次册，
-      // 让它正式多一张纸（跟 preview() 里那条 fonts.ready 是同一个道理）。
+      // 预览里改过任务，都可能让某张纸高出它自己那份下限预算（_budgetFor：图框钉住
+      // 之后随图框高走，周/人纸 1461px、目录纸 1503px；旧算法是一个常数 1047÷0.66≈1586）
+      // —— 这时压到 66% 只是把墨迹硬塞回纸面，出纸机照旧多吐一张没图签的续页。
+      // 该重排一次册，让它正式多一张纸（跟 preview() 里那条 fonts.ready 是同一个道理）。
       if (this.fit().spill) this.build();
     });
     window.addEventListener('resize', () => {
