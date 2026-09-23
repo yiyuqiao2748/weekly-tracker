@@ -264,6 +264,10 @@ body {
   font-family: var(--f-mono); font-size: 9.5px; letter-spacing: .12em;
   padding: 30px 0;
 }
+/* 续页上一列空着，意思跟首屏不一样：不是「这个人这周没排任务」，而是「他的项都在前一张纸上」。
+   「待补充」在这儿是一句假话，它会叫读图的人去补一张本来就在前页的卡 —— 跟「续 1/2」同一类错误。
+   只换文案、不换盒子（同一行字、同一层 padding），所以纸面高度不受影响，探针量到的仍然成立。 */
+.sheet-page.sheet-cont .column-body.empty::after { content: '本张无余项 / NOTHING FURTHER'; }
 .column-footer { padding: 0 10px 11px; flex-shrink: 0; }
 .column-footer button {
   width: 100%; padding: 7px;
@@ -336,6 +340,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .chip.new { color: var(--amber); border-color: currentColor; }
+
+/* 「第 N 周」：这条在同一位手上连续排到第几周（含本周）。第 1 周不印 —— 那件事
+   已经由上面那圈虚线云线 + `新增` 说了，两枚并排是重复。
+   用锈不用琥珀：琥珀归「新增」，同色会让人以为两枚徽标说的是同一件事。
+   第 4 周起整枚反白，与 `rev-open` 那枚 REV 同一个手法：摊开一叠 A3 时，
+   隔着桌子也该先看见它。两张 A3 令牌（日览与 #print-stack）里 --rust 都有定义。 */
+.chip.ten { color: var(--rust); border-color: currentColor; }
+.chip.ten.long { background: var(--rust); color: var(--paper-raised); }
 button.chip.rev { color: var(--blueprint); border-color: currentColor; cursor: pointer; transition: background .16s var(--ease); }
 button.chip.rev:hover { background: var(--blueprint-soft); }
 .task-card.rev-open button.chip.rev { background: var(--blueprint); color: var(--paper-raised); }
@@ -926,6 +938,9 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
 .sheet-page > .sheet-nil, .sheet-page > .toc { flex: 1 1 auto; }
 /* 压到下限还是装不下 —— 预览里标出来，别等打印机吐出两张才发现 */
 .sheet-paper.is-spill { outline: 1px dashed var(--rust); outline-offset: 3px; }
+/* 量尺寸用的探针纸（SheetSet._probe）。负 left 不撑出横向滚动条，
+   visibility:hidden 照样参与排版 —— 在它里面量到的高度就是真纸会有的高度。 */
+#sheet-probe { position: absolute; top: 0; left: -20000px; visibility: hidden; pointer-events: none; }
 .sheet-head {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 14px;
   padding-bottom: 6px; border-bottom: 1px solid var(--ink);
@@ -996,10 +1011,71 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
 /* 按人成册时卷与卷之间断开：换卷那一行的上边线加重并留一点呼吸 */
 .toc tbody tr.vol-break td { border-top: 1.5px solid var(--ink-3); padding-top: 10px; }
 .toc tbody tr.vol-break:first-child td { border-top: none; }
+/* 卷小计：目录页把「摊开这一卷」的四件事说成一行 —— 张数、起止张次、任务数、欠几项。
+   用的是 <th scope="row">而不是 <td>，有两个理由：语义上它给下面那几行当行头；而目录的
+   张次三处对账取的是 `tbody tr > td:first-child`，这一行没有 td，就不会把「VOL 01 · 易榆乔」
+   当成某张纸的张次读走。它顺带替掉了换卷那道加重线（有小计时不再给首行加 vol-break）。 */
+.toc tbody tr.toc-vol th {
+  padding: 4px 9px 3px; line-height: 1.25; font-size: 10.5px; letter-spacing: .03em;
+  text-transform: none; font-family: var(--f-mono); color: var(--ink-3);
+  border-top: 1.5px solid var(--ink-3); border-bottom: none; white-space: nowrap;
+}
+.toc tbody tr.toc-vol th b { color: var(--ink); font-weight: 600; letter-spacing: .1em; }
+.toc tbody tr.toc-vol th i { font-style: normal; color: var(--rust); font-weight: 500; }
+.toc tbody tr.toc-vol th i.ok { color: var(--sage); }   /* 欠 0 项也得说得出话，同横表那条 */
+/* 第一卷的小计紧贴在表头那条下线底下，再压一道重线就是双杠了。 */
+.toc tbody tr.toc-vol:first-child th { border-top: none; }
 .toc-note {
   margin-top: 6mm; padding-top: 4mm; border-top: 1px dashed var(--hair-strong);
   font-size: 11.5px; line-height: 1.75; color: var(--ink-2);
 }
+
+/* 目录页的第二张表：人 × 周。上面那张按「张」列，读图的人要问的却是
+   「这周压在谁身上、还欠几项」—— 那是另一个轴。格内写「未完成 / 任务数」，
+   底下那道细条是负荷（按全表最满的一格归一），跟看板列头那串负荷格同一套语汇。
+   按人成册时这张表还是空卷的证据：那格是 0，就是那人那周没出卷，不是漏排。
+   负荷条**绝对定位、不参与行高**：横表要是能把纸面撑高，`_paginate` 探针量过的
+   那笔账就得重算，一条装饰不值得。 */
+.toc-matrix { margin-top: 7mm; }
+.toc-matrix .tm-cap {
+  display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px;
+  font-family: var(--f-mono); font-size: 8.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.toc-matrix .tm-cap b {
+  font-family: var(--f-display); font-size: 12px; font-weight: 500;
+  letter-spacing: .04em; text-transform: none; color: var(--ink); flex-shrink: 0;
+}
+.toc-matrix table { table-layout: fixed; }
+.toc-matrix th { text-align: center; }
+.toc-matrix th.tm-p { text-align: left; }
+.toc-matrix td.tm-c { text-align: center; position: relative; white-space: nowrap; }
+.toc-matrix td.tm-p { text-align: left; white-space: nowrap; }
+.toc-matrix .tm-p i.md {
+  display: inline-block; width: 6px; height: 6px; margin-right: 7px;
+  transform: rotate(45deg); box-shadow: 0 0 0 1px rgba(0,0,0,.06);
+}
+.toc-matrix .tm-k { color: var(--rust); font-weight: 500; }
+.toc-matrix .tm-k.ok { color: var(--sage); }          /* 欠 0 项也得说得出话 */
+.toc-matrix .tm-nil .tm-k { color: var(--ink-3); }    /* 那格压根没排 */
+.toc-matrix .tm-s { color: var(--ink-3); padding: 0 3px; }
+.toc-matrix .tm-n { color: var(--ink-2); }
+/* 轨道居中并**封顶 132px**：两周那一册一格有 496px 宽，通栏的条就是 478px，胖成两块墨板，
+   「按最满的一格归一」这把尺子也跟着忽长忽短。封顶之后两册的条落在同一档里：
+   两周 132px（被上限夹住）、八周 106px（一格只有 124px，本来就没顶到）。
+   别写成「两册一样长」——那是句假话，实测见 PROGRESS 的「版面留档」末段。 */
+.toc-matrix i.tm-bar {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 2px;
+  width: calc(100% - 18px); max-width: 132px; height: 2px;
+  background: var(--hair); font-style: normal;
+}
+.toc-matrix i.tm-bar b { display: block; height: 100%; background: var(--ink-3); }
+.toc-matrix tr.tm-sum td { border-top: 1px solid var(--hair-strong); }
+/* 合计那一格与网格之间隔一道发丝线：负荷条到这儿收住，没有这条线会读成「最后一周」 */
+.toc-matrix th:last-child, .toc-matrix td:last-child { border-left: 1px solid var(--hair); }
+/* 合计行的「未完成 / 任务数」不另起颜色：铁锈色在这张表里只有一个意思（欠项），
+   换色就把这个意思弄丢了。那一行的分量由上面的加重横线与「全组合计」四个字担。 */
+.toc-matrix tr.tm-sum .tm-n { color: var(--ink); }
 
 /* 空册占位页：一张「此页无图」，虚线框是留给图纸本身的语汇，不是报错样式 */
 .sheet-nil {
@@ -1046,6 +1122,9 @@ body.sheet-preview #sheet-preview-bar { display: flex; }
     break-after: page; page-break-after: always;
   }
   .sheet-paper:last-child { break-after: auto; page-break-after: auto; }
+  /* #sheet-probe 是产品自己量尺寸用的那张「看不见的纸」（见 SheetSet._probe）：
+     它不在 #print-stack 里，出纸时必须按掉，否则会多吐一张白纸。 */
+  #sheet-probe { display: none !important; }
 }
 </style>
 </head>
@@ -1718,6 +1797,71 @@ const DataModel = {
   // 跨周比对用的身份：同一负责人 + 同一任务名视为同一条任务
   weekKey(t) { return t.person + '\u241f' + t.name; },
 
+  // 「周」化成一个可比的整数（周一的毫秒数除以 7 天，四舍五入抵掉夏令时那一小时）。
+  // 有了它，「上一周有没有这条」「连续排了几周」就是集合上的加减，不用到处
+  // 拿 addWeeks 在字符串上算 —— 跨年那一周最容易算错（W52 → 次年 W01）。
+  weekOrdinal(weekStr) {
+    // 三道关，只放过**真存在**的 ISO 周：
+    //   ① 非字符串 / 空 —— 合并进来的种子可能压根没有 `week` 字段，而 `undefined.match`
+    //      会当场抛；tenureCtx 是整板与出图共用的账本，一条脏数据不该把整页渲染带走。
+    //   ② 写法不对（少一位、W99）—— parseWeekStr 只认 W01..W53 那种两位写法。
+    //   ③ 写法对但那一周不存在（例如 2025-W53，2025 年只有 52 周）—— 不回写一遍的话，
+    //      weekStrToMonday 会一路加出界、落到次年第一周上，于是两条本来不同周的任务
+    //      拿到**同一个序号**，在册数就凭空多出一周。宁可认成「不在任何一周里」。
+    if (typeof weekStr !== 'string' || !weekStr) return null;
+    const p = WeekUtils.parseWeekStr(weekStr);
+    if (!p) return null;
+    const monday = WeekUtils.weekStrToMonday(weekStr);
+    const back = WeekUtils.getISOWeek(monday);
+    if (back.year !== p.year || back.week !== p.week) return null;
+    return Math.round(monday.getTime() / 6048e5);
+  },
+
+  // 一次遍历搭好的跨周账本：
+  //   at  = Map<weekKey, Set<周序号>>   这条任务出现在哪些周
+  //   sig = Map<weekKey + 周序号, 签名> 那一周它的定义字段（DELTA_FIELDS）长什么样
+  // taskMarks 与 _weekMarks 都只从这里读，所以「上一周有没有」全页只有一处判断。
+  tenureCtx() {
+    const at = new Map(), sig = new Map();
+    (this.state.tasks || []).forEach(t => {
+      const o = this.weekOrdinal(t.week);
+      if (o === null) return;
+      const k = this.weekKey(t);
+      let s = at.get(k);
+      if (!s) at.set(k, s = new Set());
+      s.add(o);
+      sig.set(k + '\u241f' + o, this._deltaSig(t));
+    });
+    return { at, sig };
+  },
+
+  // 定义字段的签名：与原来那套逐字段 stringify 一字不差，只是收在一处。
+  _deltaSig(t) {
+    return C.DELTA_FIELDS.map(f => String(t[f] == null ? '' : t[f])).join('\u241f');
+  },
+
+  // 一条任务在这一周的跨周读数：
+  //   streak = 含本周在内、连续在册的周数（1 == 上一周没有 == 「新增」那同一件事）
+  //   delta  = 'new' | 'rev' | ''
+  // 只往回看不往前看：读数与「这次出图排了几周」「看板停在第几周」都无关，
+  // 所以同一周的同一张卡，屏上那张与纸上那张量到的是同一个数。
+  // 60 是防死循环的保险，不是量程（真实数据里最长的一条连续挂在 6 周）。
+  taskMarks(task, ctx) {
+    const c = ctx || this.tenureCtx();
+    const out = { streak: 0, delta: '' };
+    const o = this.weekOrdinal(task.week);
+    if (o === null) return out;
+    const k = this.weekKey(task);
+    const s = c.at.get(k);
+    if (!s || !s.has(o)) return out;              // 任务自己就在表里，理论到不了
+    let n = 1;
+    while (n < 60 && s.has(o - n)) n++;
+    out.streak = n;
+    if (!s.has(o - 1)) out.delta = 'new';
+    else if (c.sig.get(k + '\u241f' + (o - 1)) !== this._deltaSig(task)) out.delta = 'rev';
+    return out;
+  },
+
   getTasks(weekStr) {
     return this.state.tasks.filter(t => t.week === weekStr).sort(this._byOrder);
   },
@@ -1938,36 +2082,33 @@ const Renderer = {
 
   renderBoard(weekStr) {
     const board = document.getElementById('board');
-    const delta = this._weekDelta(weekStr);
+    const marks = this._weekMarks(weekStr);
     const load = this._weekLoad(weekStr);
     let html = '';
     C.MEMBERS.forEach(person => {
       const tasks = FilterState.apply(DataModel.getTasksByPerson(weekStr, person));
-      html += this._renderColumn(person, tasks, load, delta);
+      html += this._renderColumn(person, tasks, load, marks);
     });
     board.innerHTML = html;
   },
 
-  // 与上一周按「负责人 + 任务名」比对：本周没有的算新增，定义字段变了的算修订。
-  // 进度和状态不计入 —— 那是这张表要跟踪的内容，不是任务的修订。
-  _weekDelta(weekStr) {
-    const prevKey = new Set();
-    const prevVal = new Map();
-    DataModel.state.tasks.forEach(t => {
-      if (t.week === WeekUtils.addWeeks(weekStr, -1)) {
-        const k = DataModel.weekKey(t);
-        prevKey.add(k);
-        prevVal.set(k, C.DELTA_FIELDS.map(f => String(t[f] == null ? '' : t[f])).join('\u241f'));
-      }
-    });
-    const out = new Map();
+  // 卡右上角那两枚跨周徽标的全部输入，一整个星期一次算清：
+  //   delta  = Map<weekKey, 'new' | 'rev'>  与上一周比：本周没有的算新增，定义字段变了的算修订
+  //   streak = Map<weekKey, n>              这条连续在册到第几周（1 = 上一周没有）
+  // 进度和状态不计入 delta —— 那是这张表要跟踪的内容，不是任务的修订。
+  // 两个读数摊在同一次 tenureCtx 上（见 DataModel.taskMarks），所以「没有上一周」
+  // 与「第 1 周」是同一句话，不会一枚徽标说没有、另一枚说有。
+  // （2026-09-23 之前这里只有一个 `_weekDelta`，返回的就是上面那个 delta Map。）
+  _weekMarks(weekStr) {
+    const ctx = DataModel.tenureCtx();
+    const delta = new Map(), streak = new Map();
     DataModel.state.tasks.forEach(t => {
       if (t.week !== weekStr) return;
-      const k = DataModel.weekKey(t);
-      if (!prevKey.has(k)) out.set(k, 'new');
-      else if (prevVal.get(k) !== C.DELTA_FIELDS.map(f => String(t[f] == null ? '' : t[f])).join('\u241f')) out.set(k, 'rev');
+      const m = DataModel.taskMarks(t, ctx);
+      if (m.delta) delta.set(DataModel.weekKey(t), m.delta);
+      streak.set(DataModel.weekKey(t), m.streak);
     });
-    return out;
+    return { delta, streak };
   },
 
   // 最近 8 周（含本周）每人接了多少项，纯本地计数
@@ -1994,12 +2135,15 @@ const Renderer = {
 
   // opts 只服务出图：divLabel 换掉列头那枚子图幅号，idSuffix 让同一页里的
   // column-* / col-body-* 不跟看板或别的页撞名（一张纸上是四个人的列）。
-  _renderColumn(person, tasks, load, delta, opts) {
+  _renderColumn(person, tasks, load, marks, opts) {
     const o = opts || {};
     const idx = C.MEMBERS.indexOf(person);
     const suffix = o.idSuffix || '';
-    const done = tasks.filter(t => t.status === '已完成').length;
-    const rate = tasks.length > 0 ? Math.round(done / tasks.length * 100) : 0;
+    // 跨页续排的续页上只有半截卡，列头那串「n 项 / 完成 x · y%」要按整周算 ——
+    // 两张纸上写同一组数字，读者才知道这是同一张图的两页，不是两张图。
+    const n = o.totals ? o.totals.n : tasks.length;
+    const done = o.totals ? o.totals.done : tasks.filter(t => t.status === '已完成').length;
+    const rate = n > 0 ? Math.round(done / n * 100) : 0;
 
     let html = `<div class="column" id="column-${idx}${suffix}">`;
     html += `<div class="column-header">
@@ -2008,14 +2152,14 @@ const Renderer = {
         <span class="person-name"><span class="dot ${C.DOT_CLASSES[idx]}"></span>${esc(person)}</span>
       </div>
       <div class="ph-right">
-        <span class="task-count">${tasks.length}<i>项</i></span>
+        <span class="task-count">${n}<i>项</i></span>
         <span class="ph-sub">完成 <b>${done}</b> · ${rate}%</span>
         ${this._sparkline(load.weeks, load.grid[idx])}
       </div>
     </div>`;
 
     html += `<div class="column-body${tasks.length === 0 ? ' empty' : ''}" id="col-body-${idx}${suffix}">`;
-    tasks.forEach((task, n) => { html += this._renderCard(task, n, delta.get(DataModel.weekKey(task))); });
+    tasks.forEach((task, n) => { html += this._renderCard(task, n, marks); });
     html += `</div>`;
 
     html += `<div class="column-footer">
@@ -2025,11 +2169,16 @@ const Renderer = {
     return html;
   },
 
-  _renderCard(task, order, delta) {
+  _renderCard(task, order, marks) {
     const pcls = C.PRIO_CLASSES[task.priority] || '';
     const name = task.name ? esc(task.name) : '<span class="placeholder">点击输入任务名称</span>';
     const notes = task.notes ? esc(task.notes) : '<span class="placeholder">备注 / NOTES</span>';
     const hist = task.history || [];
+    // 两张跨周徽标的读数一律由调用方算好递进来（_weekMarks / taskMarks），
+    // 卡片自己不查全局：整板渲染与出图铺纸因此走的是同一条判断。
+    const key = DataModel.weekKey(task);
+    const delta = (marks && marks.delta && marks.delta.get(key)) || '';
+    const streak = (marks && marks.streak && marks.streak.get(key)) || 0;
     const cls = 'task-card'
       + (delta === 'new' ? ' is-new' : '')
       + (this.openRevs.has(task.id) ? ' rev-open' : '');
@@ -2055,7 +2204,7 @@ const Renderer = {
           <em aria-hidden="true">—</em>
           <span class="date-range editable" data-field="dueDate" title="结束日期">${this._formatSingleDate(task.dueDate)}</span>
         </span>
-        <span class="rev-slot">${this._revChips(hist.length, delta)}</span>
+        <span class="rev-slot">${this._revChips({ hist: hist.length, delta, streak, status: task.status })}</span>
       </div>
       <div class="card-row">
         <span class="notes editable" data-field="notes">${notes}</span>
@@ -2064,10 +2213,21 @@ const Renderer = {
     </div>`;
   },
 
-  _revChips(n, delta) {
+  // 卡右上角那一槽的三枚徽标：在册第几周 / 新增 / REV。
+  // 收成一个入参对象是有原因的：全量渲染与 patchCard 各要填一次，四个位置参数
+  // 传错顺序不会报错、只会少画一枚徽标（`_tocMatrix` 那个 isSum 就是这么被抓出来的）。
+  //   第 N 周 —— streak > 1 才印，第 1 周就是「上一周没有」，那件事虚线云线 + `新增` 已经说了；
+  //             已完成的也不再印：这张表跟踪的是还欠着的，纸上要一眼看出谁挂了四周。
+  //   新增 / REV —— 口径与改动前一字不动（决策待定：纸上到底印不印这两枚，见「还欠着的」）。
+  _revChips(o) {
+    const n = o.hist || 0;
     let h = '';
-    if (delta === 'new') h += '<span class="chip new" title="上一周没有这条任务">新增</span>';
-    if (n || delta === 'rev') {
+    if (o.streak > 1 && o.status !== '已完成') {
+      h += `<span class="chip ten${o.streak >= 4 ? ' long' : ''}"`
+        + ` title="同一人同名连续在册 ${o.streak} 周（含本周）">第 ${o.streak} 周</span>`;
+    }
+    if (o.delta === 'new') h += '<span class="chip new" title="上一周没有这条任务">新增</span>';
+    if (n || o.delta === 'rev') {
       h += `<button type="button" class="chip rev" title="修订记录 ${n} 条">${n ? 'REV ' + n : 'REV'}</button>`;
     }
     return h;
@@ -2164,10 +2324,16 @@ const Renderer = {
     const notesEl = card.querySelector('[data-field="notes"]');
     if (notesEl) notesEl.innerHTML = task.notes ? esc(task.notes) : '<span class="placeholder">备注 / NOTES</span>';
 
-    // 修订徽标和修订表也要跟着这次编辑更新，否则 REV 计数会停在旧值
+    // 修订徽标和修订表也要跟着这次编辑更新，否则 REV 计数会停在旧值。
+    // 2026-09-23 起整槽按 taskMarks 重算：改状态、改名、换人都会改到跨周读数 ——
+    // 留着一枚「第 4 周」印在刚点成「已完成」的卡上，是这块版面最容易犯也最难看的假话。
+    // 原来这里是从 `card.classList` 里读旧答案（所以改完名，那圈「新增」虚线不会跟着动），
+    // 现在虚线与徽标同源，两处一起翻。
     const hist = task.history || [];
+    const m = DataModel.taskMarks(task);
+    card.classList.toggle('is-new', m.delta === 'new');
     const slot = card.querySelector('.rev-slot');
-    if (slot) slot.innerHTML = this._revChips(hist.length, card.classList.contains('is-new') ? 'new' : '');
+    if (slot) slot.innerHTML = this._revChips({ hist: hist.length, delta: m.delta, streak: m.streak, status: task.status });
     const table = card.querySelector('.rev-table');
     if (table) table.outerHTML = this._revTable(hist);
   },
@@ -2254,6 +2420,200 @@ const SheetSet = {
 
   setCode(week) { return this.CODE + '-' + week; },
 
+  // 装订位置：这几张纸叠成一册之后，手里这张是第几张。
+  // sheets 里的 no 只数分图，目录页不在其中（它的 no 是 0），但目录页自己
+  // 也是一张 A3 —— 所以有目录时每张纸的装订位置都要往后挪一格，
+  // 否则 8 张纸的册子最后一张写 07/08，而 08/08 这张根本不存在。
+  pos(plan, sheet) {
+    // 装订位置以「物理纸张」为准（paginate 已经数过续页）；
+    // 探针草稿阶段还没有纸张表，退回按逻辑页算，保证草稿也不会 NaN。
+    if (sheet.pos) return sheet.pos;
+    return (sheet.toc ? 0 : (sheet.no || 0)) + (plan.withToc ? 1 : 0);
+  },
+
+  // ---- 跨页续排：把装不下的那张纸按卡切开 --------------------------
+  // 旧办法是让内容整块往下流：图签栏跟着跑到第二页、页眉上也没有「续」。
+  // 现在按「一张卡」为最小单位开刀，每一半都是**完整的一张纸** ——
+  // 自己的页眉、自己的图签、自己的配平。切多页就照着重开一遍，直到装得下。
+  // 判据用「配平下限能吞下的最大自然高」（1047 ÷ 0.66 ≈ 1586px）：
+  // 切完之后每张纸通常能回到 100%，而不是继续挤在 66% 上。
+  BUDGET() { return Math.floor(this.A3_H / this.FIT_FLOOR); },
+
+  // 探针：一张看不见、但走同一套 CSS 与渲染器的纸。量它才算数 ——
+  // 报纸分栏（.sheet-flow）的配平是排版引擎的事，在 JS 里模拟必然出错。
+  _probe(html) {
+    let box = document.getElementById('sheet-probe');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'sheet-probe';
+      box.className = 'sheet-paper';
+      box.innerHTML = '<div class="sheet-page"></div>';
+      document.body.appendChild(box);
+    }
+    box.querySelector('.sheet-page').innerHTML = html;
+    return box.querySelector('.sheet-page');
+  },
+
+  _probeFits(html) {
+    return this._probe(html).scrollHeight <= this.BUDGET();
+  },
+
+  // 量完就把探针摘掉：它带的也是 .sheet-paper，留在 DOM 里会让任何
+  // 全局数纸张的脚本（包括 harness 自己）多算一张，屏上还会多出一道纸影。
+  _dropProbe() {
+    const box = document.getElementById('sheet-probe');
+    if (box) box.remove();
+  },
+
+  // 整张铺进探针，量两样东西：整张的自然高，以及每个竖排单元里每张卡的底边
+  // （都是纸内自然像素 —— 探针的 --fit 恒为 1，rect 不会被缩放骗掉）。
+  // 「这一页能画到哪儿」= limit = 下限能吞下的自然高 − 最高那列最后一张卡以下的占位。
+  _sheetGeom(html, itemSel) {
+    const page = this._probe(html);
+    const pr = page.getBoundingClientRect();
+    const k = pr.width / 1512 || 1;
+    const bottom = el => (el.getBoundingClientRect().bottom - pr.top) / k;
+    const groups = [];
+    let lastParent = null;
+    page.querySelectorAll(itemSel).forEach(el => {
+      if (el.parentElement !== lastParent) { lastParent = el.parentElement; groups.push([]); }
+      groups[groups.length - 1].push(bottom(el));
+    });
+    // tail = 「最高那一列的最后一张卡底边以下」占掉多少 —— 列框自己的下内边距、
+    // 图签栏的下边距与整条图签栏、纸的下内边距都在里面。
+    // 注意别拿图面块(block)的底边来算：图框是带内边距的，block 底边比最后一张卡的
+    // 底边低十几像素，少的正是那十几 —— 第一次实现就栽在这儿，量着 1502 装得下，
+    // 真铺出来 1599，白续一页。
+    const H = page.scrollHeight;
+    const tops = groups.filter(b => b.length).map(b => b[b.length - 1]);
+    const tail = tops.length ? H - Math.max.apply(null, tops) : 0;
+    return { h: H, limit: this.BUDGET() - tail, groups };
+  },
+
+  // 竖排堆叠的列（按周连排的四列、目录页的表体）：一页里每列各自吃到装不下为止，
+  // 剩下的进下一页。续页里第一张卡贴回列头下沿，所以底边要按「本段第一张」重新对齐。
+  _sliceGroups(bottoms, limit) {
+    const cur = bottoms.map(() => 0);
+    const parts = [];
+    while (cur.some((c, i) => c < bottoms[i].length)) {
+      const take = bottoms.map((b, i) => {
+        const c = cur[i];
+        if (c >= b.length) return 0;
+        let n = 0;
+        while (c + n < b.length && b[0] + (b[c + n] - b[c]) <= limit) n++;
+        return Math.max(n, 1);            // 一张卡就比一页高，也得给它一张纸
+      });
+      parts.push(take);
+      take.forEach((n, i) => { cur[i] += n; });
+      if (parts.length > 24) break;        // 兜底：任何量法都要退出
+    }
+    return parts;
+  },
+
+  // 报纸分栏：只能整段试排（_probeFits），二分找这一页装得下的最多张数。
+  _sliceFlow(tasks, htmlOf) {
+    const ranges = [];
+    let c = 0;
+    while (c < tasks.length) {
+      let lo = 1, hi = tasks.length - c;
+      if (hi > 1 && this._probeFits(htmlOf(c, 1))) {
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (this._probeFits(htmlOf(c, mid))) lo = mid; else hi = mid - 1;
+        }
+      }
+      ranges.push([c, c + lo]);
+      c += lo;
+    }
+    return ranges;
+  },
+
+  // 排一次册：逻辑页 → 物理纸张。每张纸带 pos（装订位置）、cont/conts（本图第几页）。
+  _paginate(plan, cfg) {
+    const papers = [];
+    const BUDGET = this.BUDGET();
+    if (plan.withToc) {
+      const idx = plan.sheets.map((s, i) => i);
+      // 试排时就把「本图第 n/m 页」那格预留出来：续排标记会让图签栏那行字变长，
+      // 长了就可能换行、换行就把整张纸撑高 —— 不预留的话量到的是矮的那版，
+      // 铺真册时才发现高出来十几像素，压到下限还超纸面，白续一页。
+      const g = this._sheetGeom(this._tocSheet(plan, cfg, { rows: idx, cont: 1, conts: 2 }),
+        // 必须限定 `toc-index`：目录页现在有两张表，裸 `.toc table tbody > tr` 会把
+        // 任务分布横表那五行也当成目录行切一刀 —— 切分对象错了，段数和卡数全乱。
+        '.toc table.toc-index tbody > tr');
+      if (g.h <= BUDGET || !g.groups.length) papers.push({ kind: 'toc', rows: idx });
+      else {
+        let c = 0;
+        this._sliceGroups(g.groups, g.limit).forEach(take => {
+          papers.push({ kind: 'toc', rows: idx.slice(c, c + take[0]) });
+          c += take[0];
+        });
+      }
+    }
+    const draft = { cont: 1, conts: 2 };   // 试排一律按「带续排标记」量，见上面目录页那条注释
+    plan.sheets.forEach(s => {
+      if (s.kind === 'week') {
+        const cols = C.MEMBERS.map(p => this.tasksFor(s.week, p, cfg));
+        const g = this._sheetGeom(this._weekSheet(s, plan, cfg, Object.assign({ cols }, draft)),
+          '.sheet-board .column-body > .task-card');
+        if (g.h <= BUDGET) { papers.push({ kind: 'week', sheet: s, cols }); return; }
+        const cur = cols.map(() => 0);
+        this._sliceGroups(g.groups, g.limit).forEach(take => {
+          papers.push({ kind: 'week', sheet: s,
+            cols: cols.map((list, i) => list.slice(cur[i], cur[i] + take[i])) });
+          take.forEach((n, i) => { cur[i] += n; });
+        });
+        return;
+      }
+      const htmlOf = (from, n) => this._personSheet(s, plan, cfg,
+        Object.assign({ tasks: s.tasks.slice(from, from + n) }, draft));
+      const whole = this._probe(htmlOf(0, s.tasks.length)).scrollHeight;
+      if (whole <= BUDGET) { papers.push({ kind: 'person', sheet: s, tasks: s.tasks }); return; }
+      this._sliceFlow(s.tasks, htmlOf).forEach(([a, b]) =>
+        papers.push({ kind: 'person', sheet: s, tasks: s.tasks.slice(a, b) }));
+    });
+    papers.forEach((p, i) => { p.pos = i + 1; });
+    // 同一逻辑页被切成几张 → 标上「本图第 n / m 页」，目录页也要能看出这是个区间
+    const runs = new Map();
+    papers.forEach(p => {
+      const key = p.sheet || 'toc';
+      const list = runs.get(key) || [];
+      list.push(p);
+      runs.set(key, list);
+    });
+    runs.forEach(list => list.forEach((p, i) => { p.cont = i + 1; p.conts = list.length; }));
+    plan.sheets.forEach(s => {
+      const list = runs.get(s);
+      s.posA = list[0].pos;
+      s.posB = list[list.length - 1].pos;
+      s.parts = list.length;
+    });
+    // 卷内张次：按人成册时「一卷 = 一个人从头到尾那几张纸」。装订位置（`pos`）回答的是
+    // 「这张是整册第几张」，回答不了「易榆乔那一卷是不是少了一张」——一叠 13 张纸摊在桌上
+    // 要分给四个人时，后一个问题才是实际会问的。卷内号只写进页眉，图签栏的 `SHT` 与
+    // 「本图 n/m」口径不动（见决策 13：那两格一个是装订位置、一个是一张图自己的页次）。
+    // 一个人在册里是**连着排**的（`plan()` 先按人、再按周），所以卷内就是纸张表上的一段连续区间。
+    plan.volumes = [];
+    if (cfg.mode === 'persons') {
+      const byPerson = new Map();
+      papers.forEach(p => {
+        if (p.kind !== 'person') return;
+        const list = byPerson.get(p.sheet.person) || [];
+        list.push(p);
+        byPerson.set(p.sheet.person, list);
+      });
+      C.MEMBERS.forEach(person => {
+        const list = byPerson.get(person);
+        if (!list) return;
+        list.forEach((p, i) => { p.volPos = i + 1; p.volPapers = list.length; });
+        plan.volumes.push({ person, papers: list.length,
+          first: list[0].pos, last: list[list.length - 1].pos });
+      });
+    }
+    this._dropProbe();
+    return papers;
+  },
+
   // 整套图的图册号：单周不写区间，多周写成 W36–W39
   suiteCode(plan) {
     if (plan.first === plan.last) return this.CODE + '-' + plan.first;
@@ -2291,7 +2651,12 @@ const SheetSet = {
       { k: '图号', v: sheet.code },
     ];
     if (sheet.vol) cells.push({ k: '册', v: sheet.vol });
-    cells.push({ k: '张次', v: sheet.toc ? 'INDEX' : sheet.nil ? 'NIL' : `SHT ${pad(sheet.no)}/${pad(plan.total)}` });
+    // 一张图号被续排拆到几张纸上时，张次后头带上「本图第几页」：图号只有一枚，纸有好几张。
+    // 写「本图」不写「续」—— 第一页不是续页，标「续 1/2」是假话；这一格在每张纸上同形，
+    // 只有数字变，量高度的时候才不会因为文案长短而抖。
+    const seq = sheet.toc ? 'INDEX' : sheet.nil ? 'NIL'
+      : `SHT ${pad(this.pos(plan, sheet))}/${pad(plan.total)}`;
+    cells.push({ k: '张次', v: seq + (sheet.conts > 1 ? ` · 本图 ${sheet.cont}/${sheet.conts}` : '') });
     cells.push({ k: '签发', v: `${now.getFullYear()}.${pad(now.getMonth() + 1)}.${pad(now.getDate())}` });
     cells.push({ k: '比例', v: 'NTS' });
     cells.push({ k: '版次', v: 'R1' });
@@ -2302,12 +2667,21 @@ const SheetSet = {
   },
 
   _head(sheet, plan) {
+    const pad = n => String(n).padStart(2, '0');
+    // 页眉这格是装订位置（第几张纸），不是分图号 —— 目录页自己占第 01 张
+    const seq = `第 ${pad(this.pos(plan, sheet))} / ${pad(plan.total)} 张`;
+    // 按人成册且不止一卷时才加后半句：一卷就一个人数得过来，写「本卷」是给自己添一格数字。
+    // 这半句跟着 `seq` 进同一个 `<b>`（15px 等宽），为的是摊开一叠纸就能看见；
+    // `.sh-right` 是 nowrap、左边那两行离它还有九百多像素，加宽一百来像素挤不到换行
+    // （`.preview/head_geom.py` 逐张量过页眉与左块的高度，见决策 17）。
+    const vols = plan.volumes && plan.volumes.length > 1;
+    const volSeq = (vols && sheet.volPos) ? ` · 本卷 ${pad(sheet.volPos)} / ${pad(sheet.volPapers)}` : '';
     return `<div class="sheet-head">
       <div>
-        <div class="sh-title">${esc(sheet.title)}</div>
+        <div class="sh-title">${esc(sheet.title)}${sheet.conts > 1 && sheet.cont > 1 ? ' · 续' : ''}</div>
         <div class="sh-sub">效果图部门 · 周任务进度表 · ${esc(sheet.code)}${sheet.vol ? ' · ' + esc(sheet.vol) : ''}</div>
       </div>
-      <div class="sh-right"><span>${esc(suiteRangeLabel(plan))}</span><b>${sheet.toc ? '目录' : sheet.nil ? '占位' : `第 ${String(sheet.no).padStart(2, '0')} / ${String(plan.total).padStart(2, '0')} 张`}</b></div>
+      <div class="sh-right"><span>${esc(suiteRangeLabel(plan))}</span><b>${sheet.nil ? '占位' : sheet.toc ? '目录 · ' + seq : seq + volSeq}</b></div>
     </div>`;
   },
 
@@ -2338,59 +2712,152 @@ const SheetSet = {
     return html + `</div>`;
   },
 
-  _weekSheet(sheet, plan, cfg) {
+  // 把这张纸的装订信息抄到图签用的 meta 上（pos=第几张纸，cont/conts=本图第几页）
+  _mark(meta, paper) {
+    if (paper) {
+      meta.pos = paper.pos; meta.cont = paper.cont; meta.conts = paper.conts;
+      meta.volPos = paper.volPos; meta.volPapers = paper.volPapers;
+    }
+    return meta;
+  },
+
+  // paper = 这张纸留哪些卡（跨页续排切出来的一段）；不给就是整张。
+  _weekSheet(sheet, plan, cfg, paper) {
     const load = Renderer._weekLoad(sheet.week);
-    const delta = Renderer._weekDelta(sheet.week);
-    const cols = C.MEMBERS.map((p, i) =>
-      Renderer._renderColumn(p, this.tasksFor(sheet.week, p, cfg), load, delta,
-        { divLabel: `分图 ${String(i + 1).padStart(2, '0')}`, idSuffix: `-s${sheet.no}` })
-    ).join('');
-    // 列头那串负荷迷你格始终按全部任务计数 —— 它是这个人的历史节律，
+    const marks = Renderer._weekMarks(sheet.week);
+    const cols = (paper && paper.cols) || C.MEMBERS.map(p => this.tasksFor(sheet.week, p, cfg));
+    // 列头的人数与完成率始终按整周算：续页上那半截卡不能把它改小，
+    // 不然两张纸上的「4 项 / 8 项」看着像两回事。
+    // 负荷迷你格同理走 load —— 它是这个人的历史节律，
     // 不该被「只出未完成」这类出图范围改动含义。
-    const meta = {
+    const totals = C.MEMBERS.map((p, i) => {
+      const all = this.tasksFor(sheet.week, p, cfg);
+      return { n: all.length, done: all.filter(t => t.status === '已完成').length };
+    });
+    const html = cols.map((list, i) => Renderer._renderColumn(C.MEMBERS[i], list, load, marks, {
+      divLabel: `分图 ${String(i + 1).padStart(2, '0')}`,
+      idSuffix: `-s${sheet.no}${paper && paper.conts > 1 ? 'c' + paper.cont : ''}`,
+      totals: totals[i],
+    })).join('');
+    const meta = this._mark({
       week: sheet.week, no: sheet.no,
       title: this.weekLabel(sheet.week) + ' 任务进度表',
       code: this.setCode(sheet.week),
       people: C.MEMBERS.join(' · '),
-    };
+    }, paper);
     return this._head(meta, plan)
       + this._stats(sheet.week, null, cfg)
-      + `<div class="sheet-board">${cols}</div>`
+      + `<div class="sheet-board">${html}</div>`
       + this._tbCells(plan, meta);
   },
 
-  _personSheet(sheet, plan, cfg) {
+  _personSheet(sheet, plan, cfg, paper) {
     const idx = C.MEMBERS.indexOf(sheet.person) + 1;
     const vol = `VOL ${String(idx).padStart(2, '0')} · ${sheet.person}`;
     const title = `${sheet.person} · ${this.weekLabel(sheet.week)} 任务进度表`;
     const code = `${this.setCode(sheet.week)}-${String(idx).padStart(2, '0')}`;
-    const delta = Renderer._weekDelta(sheet.week);
-    const cards = sheet.tasks.map((t, n) =>
-      Renderer._renderCard(t, n, delta.get(DataModel.weekKey(t)))).join('');
-    const meta = { week: sheet.week, no: sheet.no, title, code, vol, people: sheet.person };
+    const marks = Renderer._weekMarks(sheet.week);
+    const tasks = (paper && paper.tasks) || sheet.tasks;
+    const cards = tasks.map((t, n) => Renderer._renderCard(t, n, marks)).join('');
+    const meta = this._mark({ week: sheet.week, no: sheet.no, title, code, vol, people: sheet.person }, paper);
     return this._head(meta, plan)
       + this._stats(sheet.week, sheet.person, cfg)
-      + `<div class="sheet-flow${sheet.tasks.length > 5 ? '' : ' sparse'}">${cards}</div>`
+      + `<div class="sheet-flow${tasks.length > 5 ? '' : ' sparse'}">${cards}</div>`
       + this._tbCells(plan, meta);
   },
 
-  _tocSheet(plan, cfg) {
+  // 目录页第二张表：人 × 周（观感与理由见 CSS 里 `.toc-matrix` 那段）。
+  // 只在目录的**第一张纸**上画：横表统共四行，重复到续页上是噪音。
+  // 试排（`_paginate` 里那份 cont:1 的草稿）带着它，所以量出来的 limit 是「带横表」
+  // 那一版 —— 偏小，续页只会更松，不会反过来超。
+  _tocMatrix(plan, cfg) {
+    const weeks = plan.weeks;
+    const ZERO = { n: 0, k: 0 };
+    const cell = (w, p) => {
+      const list = this.tasksFor(w, p, cfg);
+      return { n: list.length, k: list.filter(t => t.status !== '已完成').length };
+    };
+    const add = (a, b) => ({ n: a.n + b.n, k: a.k + b.k });
+    const grid = C.MEMBERS.map(p => weeks.map(w => cell(w, p)));
+    // 负荷条按全表最满的一格归一（不是按行、不是按周），横着比和竖着比才是同一个尺子
+    const max = Math.max(1, ...grid.map(r => Math.max(...r.map(c => c.n))));
+    // 只有「一人一周」那几格画负荷条。合计格是另一种量（跨周或跨人累加），
+    // 拿同一把尺子量会把条撑出格子，而且「谁这周最满」这件事本来就在网格里比。
+    const td = (c, isSum) => `<td class="tm-c${c.n ? '' : ' tm-nil'}">`
+      + `<span class="tm-k${c.k || !c.n ? '' : ' ok'}">${c.n ? c.k : '—'}</span>`
+      + (c.n ? `<span class="tm-s">/</span><span class="tm-n">${c.n}</span>` : '')
+      + (isSum ? '' : `<i class="tm-bar"><b style="width:${c.n ? Math.max(8, Math.round(c.n / max * 100)) : 0}%"></b></i>`)
+      + '</td>';
+    const wpct = (68 / weeks.length).toFixed(2);
+    const cols = '<colgroup><col style="width:20%">'
+      + weeks.map(() => `<col style="width:${wpct}%">`).join('')
+      + '<col style="width:12%"></colgroup>';
+    const head = `<tr><th class="tm-p">制图人</th>`
+      // 表头那一格只写 `W39`：八周并排时全名「2026年第39周」会挤成两行，
+      // 年份与区间已经写在上面那行说明里了（术语表：周 = `W39`）。
+      + weeks.map(w => `<th>W${esc(String(w).split('-W')[1] || '')}</th>`).join('')
+      + '<th>合计</th></tr>';
+    // `r.map(td)` 这种写法在这儿是**陷阱**：`map` 会把下标当第二个实参递进来，
+    // 而第二个实参正是 `isSum` —— 于是每行只有第 0 格画得出负荷条，其余全被当成合计格。
+    // （断言「网格每格都得有负荷条」当场把它抓了出来，见 .preview/verify_sheet.py。）
+    const rows = grid.map((r, i) => `<tr>`
+      + `<td class="zh tm-p"><i class="md ${C.DOT_CLASSES[i]}"></i>${esc(C.MEMBERS[i])}</td>`
+      + r.map(c => td(c)).join('') + td(r.reduce(add, ZERO), 1) + '</tr>').join('');
+    const colTot = weeks.map((w, j) => grid.reduce((a, r) => add(a, r[j]), ZERO));
+    const sum = '<tr class="tm-sum"><td class="zh tm-p">全组合计</td>'
+      + colTot.map(c => td(c, 1)).join('') + td(colTot.reduce(add, ZERO), 1) + '</tr>';
+    const gap = cfg.mode === 'persons' ? ' · 按人成册时那格的 0 就是没出卷的一周' : '';
+    return `<div class="toc-matrix">
+      <div class="tm-cap"><b>任务分布 · Task Matrix</b><span>格内为「未完成 / 任务数」，细条为负荷（按最满的一格归一）${gap}</span></div>
+      <table>${cols}<thead>${head}</thead><tbody>${rows}${sum}</tbody></table>
+    </div>`;
+  },
+
+  _tocSheet(plan, cfg, paper) {
+    const pad = n => String(n).padStart(2, '0');
     let prevVol = 0;
-    const rows = plan.sheets.map(s => {
+    const listed = ((paper && paper.rows) || plan.sheets.map((s, i) => i)).map(i => plan.sheets[i]);
+    // 卷小计只在按人成册且**不止一卷**时出现 —— 与页眉「本卷 k / m」共用决策 17 那道闸：
+    // 整册就一卷时，「本卷几张」跟全册张次是同一个数，那行纯属重复。
+    // 任务数与欠项按**整册**算，不按 `listed` 算：目录页被续排切开时，后半张上那一卷
+    // 只剩几行，小计说的仍是这一卷的全貌（它因此只在卷的真·第一行前面出现一次）。
+    const vols = (cfg.mode === 'persons' && plan.volumes && plan.volumes.length > 1) ? plan.volumes : null;
+    const volStat = {};
+    if (vols) {
+      plan.sheets.forEach(s => {
+        if (s.kind !== 'person') return;
+        const st = volStat[s.person] || (volStat[s.person] = { n: 0, done: 0, first: s });
+        st.n += s.tasks.length;
+        st.done += s.tasks.filter(t => t.status === '已完成').length;
+      });
+    }
+    const rows = listed.map(s => {
       const tasks = s.kind === 'week'
         ? C.MEMBERS.reduce((a, p) => a.concat(this.tasksFor(s.week, p, cfg)), [])
         : s.tasks;
       const done = tasks.filter(t => t.status === '已完成').length;
       const rate = tasks.length ? Math.round(done / tasks.length * 100) : 0;
       const vn = s.kind === 'person' ? C.MEMBERS.indexOf(s.person) + 1 : 0;
-      // 成册时给每卷开头一道加重横线，目录上能看出「这里换了一卷」
-      const brk = cfg.mode === 'persons' && vn !== prevVol;
+      const vol = vols && s.kind === 'person' ? vols.find(v => v.person === s.person) : null;
+      const st = vol && volStat[s.person].first === s ? volStat[s.person] : null;
+      // 小计行用 <th scope="row"> 而不是 <td>：语义上它是下面那几行的行头，
+      // 且目录的张次对账取的是 `tbody tr > td:first-child`，这行没有 td，就不会被读成一张纸。
+      const lead = st
+        ? `<tr class="toc-vol"><th colspan="8" scope="row">`
+          + `<b>VOL ${pad(vn)} · ${esc(s.person)}</b>`
+          + ` 本卷 ${vol.papers} 张 · ${vol.first === vol.last ? '第 ' + pad(vol.first) : '第 ' + pad(vol.first) + '–' + pad(vol.last)} 张`
+          + ` · 任务 ${st.n} 项 · <i class="${st.n - st.done ? '' : 'ok'}">欠 ${st.n - st.done} 项</i>`
+          + `</th></tr>`
+        : '';
+      // 成册时给每卷开头一道加重横线，目录上能看出「这里换了一卷」；
+      // 有小计那一行时它自己就带了上边线，下面这张行不再重复加重。
+      const brk = cfg.mode === 'persons' && vn !== prevVol && !st;
       prevVol = vn;
       const meta = s.kind === 'week'
         ? { title: this.weekLabel(s.week), code: this.setCode(s.week), vol: '—', people: tasks.length }
         : { title: `${s.person} · ${this.weekLabel(s.week)}`, code: `${this.setCode(s.week)}-${String(vn).padStart(2, '0')}`, vol: `VOL ${String(vn).padStart(2, '0')}`, people: tasks.length };
-      return `<tr${brk ? ' class="vol-break"' : ''}>
-        <td class="num">${String(s.no).padStart(2, '0')}</td>
+      return `${lead}<tr${brk ? ' class="vol-break"' : ''}>
+        <td class="num">${s.posA ? (s.posA === s.posB ? pad(s.posA) : pad(s.posA) + '–' + pad(s.posB)) : pad(this.pos(plan, s))}</td>
         <td>${esc(meta.code)}</td>
         <td class="zh">${esc(meta.title)}</td>
         <td>${esc(WeekUtils.formatDimRange(s.week))}</td>
@@ -2409,25 +2876,43 @@ const SheetSet = {
     // 一张任务只属于一个人 + 一周，各页之间天然不重不漏，直接计数
     const total = all.length;
     const done = all.filter(t => t.status === '已完成').length;
+    // 册级「挂了几周」读数：纸上那几枚 `第 N 周` 的汇总，判的是同一份 taskMarks，
+    // 所以把这一册的分图挨张数一遍，数出来的徽标要和这句里的数一模一样。
+    // 数的是**卡**不是**身份**：同一条在两张纸上就记两次 —— 与上面那句
+    // 「同一条任务在相邻两周各记一次」同一口径，换成去重这两句会互相打脸。
+    const tctx = DataModel.tenureCtx();
+    let stuck = 0, longest = 0;
+    all.forEach(t => {
+      if (t.status === '已完成') return;
+      const n = DataModel.taskMarks(t, tctx).streak;
+      if (n > 1) { stuck++; longest = Math.max(longest, n); }
+    });
+    const stuckNote = stuck
+      ? `未完成里 ${stuck} 项已连续在册到第 2 周以上，最长的一项在纸上印着「第 ${longest} 周」。`
+      : `未完成里没有一条排到第 2 周。`;
     const scope = { all: '全部任务', open: '只出未完成', filtered: '沿用看板当前筛选' }[cfg.scope];
+    // 卷内那句跟着页眉的**同一道闸**（`volumes.length > 1`）：只有一卷时纸上压根不印
+    // 「本卷」，目录却解释它，就是让读的人去找一格不存在的数字。
+    const volNote = (plan.volumes && plan.volumes.length > 1)
+      ? '页眉的「本卷 k / m」数的是自己那一卷摊开的张数，与全册张次各说各的。' : '';
     const order = cfg.mode === 'persons'
-      ? '按人成册，每人一卷（VOL），卷内按周从旧到新；当周没有排任务的人不出空卷。'
+      ? '按人成册，每人一卷（VOL），卷内按周从旧到新；当周没有排任务的人不出空卷。' + volNote
       : '按周连排，一人一张分图（四人四张），排空的周也保留一张，作为「本周没排」的证据。';
     const note = `<div class="toc-note">本册 ${plan.weeks.length} 周（${esc(this.weekLabel(plan.first))} 至 ${esc(this.weekLabel(plan.last))}），`
-      + `共 ${plan.total} 张 A3 横排，收录范围：${esc(scope)}。${esc(order)}<br>`
-      + `合计 ${total} 项、已完成 ${done} 项；同一条任务在相邻两周各记一次，按周分别计数。<br>`
+      + `共 ${plan.total} 张 A3 横排（含本页，本页是第 01 张），收录范围：${esc(scope)}。${esc(order)}<br>`
+      + `合计 ${total} 项、已完成 ${done} 项；同一条任务在相邻两周各记一次，按周分别计数。${stuckNote}<br>`
       + `数据截至 ${esc(new Date().toLocaleString('zh-CN', { hour12: false }))}，来源为云端 Gist 与本机缓存合并后的结果。</div>`;
-    const meta = {
+    const meta = this._mark({
       week: plan.last, no: 0, toc: true, period: this.suiteRange(plan),
       title: '图纸目录 · Drawing Index',
       code: this.suiteCode(plan),
       people: C.MEMBERS.join(' · '),
-    };
+    }, paper);
     return this._head(meta, plan)
-      + `<div class="toc"><table>
+      + `<div class="toc"><table class="toc-index">
           <thead><tr><th class="num">张次</th><th>图号</th><th>图名</th><th>周期</th><th>册</th><th class="num">任务</th><th class="num">完成</th><th class="num">率</th></tr></thead>
           <tbody>${rows}</tbody>
-        </table>${note}</div>`
+        </table>${(paper && paper.cont > 1) ? '' : this._tocMatrix(plan, cfg)}${note}</div>`
       + this._tbCells(plan, Object.assign({}, meta, { title: '周任务进度表 · 图纸目录' }));
   },
 
@@ -2468,27 +2953,75 @@ const SheetSet = {
 
   // ---- 铺纸 / 预览 / 出纸 -------------------------------------------
 
+  // 排一次册，并把「上限 16 张」那笔账收在**实际纸张**上。
+  // `build()` 与 `updateSummary()` 共用这一个实现（2026-09-22，尾巴③）：同一件事一旦有
+  // 两套算法，两套就会各自说谎 —— 摘要那三句假话（打脸的压周说明、带过来的配平读数、
+  // 少报一张的张数）全是这么来的。返回的是物理纸张，顺带把 `capped` / `trimmed` /
+  // `overCap` 三格按**这一册**重算，不给上一册留残值。
+  planPapers(base) {
+    const clamped = this.clampCount(base.count, base.mode);
+    this.capped = clamped.capped;
+    // 被上限压掉的是「这次排纸用几周」，不是「用户要几周」：base.count 保持原值，
+    // 否则重开对话框时周数下拉会自己变成压完的 3，用户看着像被吞了一次输入。
+    //
+    // `clampCount` 只看**逻辑页**（一周一张、按人四张），它管不着续排：一张纸被切成
+    // 两半之后物理纸张还会往上涨，原来 `MAX_PAGES` 因此是个**假上限**（2026-09-22 记在
+    // 「还欠着的」里的尾巴①）。这里在切完之后按**实际纸张**复核一次：超了就从**最旧的
+    // 那一周**起丢（连排是从截止周往回数的，最近的周才是用户要的），再整册重排。
+    // 重排而不是「砍掉多出来的那几张」：张次、目录区间、图签分母全都建立在完整的一册上，
+    // 从尾巴上摘纸会让「第 09 / 17 张」这种读数当场对不上。
+    let count = clamped.count, plan = null, papers = [], over = 0;
+    this.trimmed = null; this.overCap = 0;
+    for (;;) {
+      plan = this.plan(Object.assign({}, base, { count }));
+      if (!plan.sheets.length) { papers = []; break; }
+      papers = this._paginate(plan, base);
+      if (papers.length <= this.MAX_PAGES || count <= 1) break;
+      over = Math.max(over, papers.length - this.MAX_PAGES);
+      count -= 1;
+    }
+    if (papers.length > this.MAX_PAGES && count === 1) {
+      // 只剩一周还超上限：那是「一个人一周灌了两百项」，没有周可丢了。
+      // 不硬压、不裁纸，照原样出，只在摘要里把超了多少张说清楚。
+      this.overCap = papers.length - this.MAX_PAGES;
+    } else if (count < clamped.count) {
+      // `want` 存的是**用户开口要的那几周**：压周一共有两处（`clampCount` 看逻辑页、
+      // 这一圈看实际纸张），摘要只报一次总数，不然「压到 1」和「丢掉 1 周」并排印出来，
+      // 读的人分不清那个 1 是哪个 1。
+      this.trimmed = { weeks: clamped.count - count, used: count, over, want: base.count };
+    }
+    // 目录页与续页各自占一张纸，都进分母；张数从这一行起就是**纸**不是**页**。
+    // 空册那一路 papers 是空的，`plan.total` 留给 `plan()` 算出来的 0，占位页不进摘要。
+    if (papers.length) plan.total = papers.length;
+    return { plan, papers, count };
+  },
+
   build(cfg) {
     this.cfg = Object.assign(this.defaultCfg(), cfg || this.cfg || {});
-    const clamped = this.clampCount(this.cfg.count, this.cfg.mode);
-    this.capped = clamped.capped;
-    // 被上限压掉的是「这次排纸用几周」，不是「用户要几周」：this.cfg 保持原值，
-    // 否则重开对话框时周数下拉会自己变成压完的 3，用户看着像被吞了一次输入。
-    const plan = this.plan(Object.assign({}, this.cfg, { count: clamped.count }));
+    const r = this.planPapers(this.cfg);
+    const plan = r.plan, papers = r.papers;
     this.lastPlan = plan;
     // 纸（.sheet-paper，屏上带边带影、纸上只管分页）包着画布（.sheet-page，
     // 固定 1512×1047 = A3 可印区），配平缩放发生在画布这一层。
-    const page = s => `<div class="sheet-paper"><div class="sheet-page">${s}</div></div>`;
-    const html = [];
-    if (plan.withToc) html.push(page(this._tocSheet(plan, this.cfg)));
-    plan.sheets.forEach(s => {
-      html.push(page(s.kind === 'week'
-        ? this._weekSheet(s, plan, this.cfg)
-        : this._personSheet(s, plan, this.cfg)));
-    });
+    // 第二参数是「这张纸是某张图的第二页起」——只用来换续页上那句空列说明（见 CSS 里
+    // `.sheet-cont` 那条），不参与量高度：试排量的是整张未切的纸，那时 cont 恒 1。
+    const page = (s, cont) => `<div class="sheet-paper"><div class="sheet-page${cont ? ' sheet-cont' : ''}">${s}</div></div>`;
+    const stack = document.getElementById('print-stack');
     // 一张都没有：换成「此页无图」占位页，屏上有解释、纸上也有东西可打
-    if (!plan.sheets.length) html.push(page(this._emptySheet(plan, this.cfg)));
-    document.getElementById('print-stack').innerHTML = html.join('');
+    if (!plan.sheets.length) {
+      stack.innerHTML = page(this._emptySheet(plan, this.cfg));
+      this.fit();
+      return plan;
+    }
+    // 两遍铺纸：第一遍把整张铺进探针量尺寸，决定哪几张要开刀（`planPapers` 里已经量过，
+    // 切口就记在 `plan.sheets` 的 `parts` / `posA` / `posB` 上，这里不重复探一遍）；
+    // 第二遍按切口铺真册 —— 张次、图名上的「续」都按物理纸张算，得等切完才知分母。
+    // `plan.total` 已是纸张数（`planPapers` 那一行改写的），这里不再另算一遍。
+    stack.innerHTML = papers.map(p => page(
+      p.kind === 'toc' ? this._tocSheet(plan, this.cfg, p)
+        : p.kind === 'week' ? this._weekSheet(p.sheet, plan, this.cfg, p)
+        : this._personSheet(p.sheet, plan, this.cfg, p),
+      p.conts > 1 && p.cont > 1)).join('');
     this.fit();
     return plan;
   },
@@ -2500,17 +3033,33 @@ const SheetSet = {
   FIT_FLOOR: .66,
   fit() {
     const H = this.A3_H;
+    const stack = document.getElementById('print-stack');
+    // #print-stack 在屏上是 display:none（只有预览层与打印媒体才让它露出来），看不见
+    // 就量不到高度：scrollHeight 全是 0，拿 0 去配平等于把上一次量好的缩放抹回 100%，
+    // 那张本来就超纸面的纸就再没人管了。所以临时借一次预览态来量、量完还原 ——
+    // 整段同步，中间不重绘，用户看不到这一帧。借了还看不见（整页被隐藏）才真的跳过。
+    const borrow = !stack.getClientRects().length;
+    if (borrow) document.body.classList.add('sheet-preview');
+    if (!stack.getClientRects().length) {
+      document.body.classList.remove('sheet-preview');   // 走到这儿 borrow 必为真
+      return { worst: 1, spill: 0, skipped: true };
+    }
     let worst = 1, spill = 0;
     document.querySelectorAll('#print-stack .sheet-paper').forEach(paper => {
       const page = paper.querySelector('.sheet-page');
       const h = page.scrollHeight;
-      const fc = h > H ? Math.max(this.FIT_FLOOR, H / h) : 1;
+      // 装不下的那张按 H−1 配平、并且**向下截断**到四位小数：
+      // 四舍五入会把盒子顶到 1047.03px，而可印区只有 1046.9px —— 多出那零点
+      // 三像素足以让出纸机多吐一张空白续页（2026-09-22 在续排用例上真出过）。
+      const fc = h > H ? Math.max(this.FIT_FLOOR, Math.floor((H - 1) / h * 1e4) / 1e4) : 1;
       paper.style.setProperty('--fc', fc.toFixed(4));
       paper.style.setProperty('--nat', Math.max(H, h) + 'px');
       paper.classList.toggle('is-spill', h * fc > H + 1);
       worst = Math.min(worst, fc);
       if (h * fc > H + 1) spill++;
     });
+    // 借来的预览态必须在这里还掉，否则非预览页会被它自己塞的 class 留在预览样式里。
+    if (borrow) document.body.classList.remove('sheet-preview');
     this.minFit = worst;
     this.spillPages = spill;
     return { worst, spill };
@@ -2530,11 +3079,19 @@ const SheetSet = {
     document.body.classList.add('sheet-preview');
     this.viewFit();
     document.getElementById('pv-set').textContent = this.summaryText(plan, false);
-    // 思源宋体是后到的，字一换行高就变；字体落地后重新配平一次
+    // 思源宋体是后到的，字一换行高就变。麻烦的是「量着装得下」的那张纸，字体落地后
+    // 可能高出十几像素：只重新配平的话，66% 的下限会把多出来的高度硬压回纸面 —— 纸是
+    // 装下了，字却凭空小一圈，而续排明明可以再给它一张纸。所以落地后再量一次，
+    // 真超了就照新的行高重排一次册（build 末尾自己会再 fit 一遍）。
+    // WebKit 那条通道就是这一例的现成证据：它 2026-09-22 量到一张 1592px 的纸压到 66%
+    // 还露出纸面 545px，而 Chromium 同一页在字体先落地的顺序下切得干干净净。
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
-        this.fit();
-        document.getElementById('pv-set').textContent = this.summaryText(plan, false);
+        if (!document.body.classList.contains('sheet-preview')) return;   // 用户已经关了预览
+        const again = this.fit();
+        const out = again.spill ? this.build() : plan;
+        this.viewFit();
+        document.getElementById('pv-set').textContent = this.summaryText(out, false);
       });
     }
     return plan;
@@ -2566,7 +3123,23 @@ const SheetSet = {
     if (cfg.mode === 'persons') bits.push('按人成册');
     if (cfg.scope === 'open') bits.push('只出未完成');
     if (cfg.scope === 'filtered') bits.push('沿用当前筛选');
-    if (this.capped) bits.push(`周数已压到 ${cfg.count}（上限 ${this.MAX_PAGES} 张）`);
+    if (this.capped && !this.trimmed) bits.push(`周数已压到 ${cfg.count}（上限 ${this.MAX_PAGES} 张）`);
+    // 续排把物理纸张顶过上限：丢的是最旧的周，说清楚丢了几个、实排几个。
+    // 与上面那句**互斥**：两处压周各报各的数会打脸（「压到 1」＋「丢掉 1 周」，
+    // 那个 1 到底指谁）。合起来说过一次，就把续排顶出来的那一截单独标出来。
+    if (this.trimmed) {
+      const total = this.trimmed.want - cfg.count;
+      bits.push(total > this.trimmed.weeks
+        ? `上限 ${this.MAX_PAGES} 张 · 从最旧的周起丢掉 ${total} 周（其中续排顶出 ${this.trimmed.weeks} 周），实排 ${cfg.count} 周`
+        : `续排后超出上限 ${this.trimmed.over} 张 · 从最旧的周起丢掉 ${this.trimmed.weeks} 周，实排 ${cfg.count} 周`);
+    }
+    if (this.overCap) bits.push(`已超上限 ${this.overCap} 张（只剩一周，没有可丢的周）`);
+    // 切开续排时要说清楚：「9 张」里有几张是被拆出来的，别让人以为排了 9 周
+    const split = plan.sheets.filter(s => s.parts > 1);
+    if (split.length) {
+      const extra = plan.total - (plan.sheets.length + (plan.withToc ? 1 : 0));
+      bits.push(`续排 ${split.length} 张 → ${split.length + extra} 张`);
+    }
     if (this.minFit != null && this.minFit < .999) bits.push(`配平 ${Math.round(this.minFit * 100)}%`);
     if (this.spillPages) bits.push(`${this.spillPages} 张压到下限仍超纸面 · 出纸会续页`);
     return bits.join(' · ');
@@ -2614,16 +3187,26 @@ const SheetSet = {
 
   // 摘要要按「真会打出来的那个计划」算：先套上限再排纸，
   // 否则会出现「摘要说 21 张、实际只出 12 张」这种对不上的数字。
+  //
+  // 这一行现在**照字面执行**了：走 `planPapers()`（与 `build()` 同一套），所以对话框里
+  // 那个「N 张」就是真铺出来会数到的纸。以前它只 `plan()` 量**逻辑页**，册子里只要有一张
+  // 被续排切开就少报一张 —— 2026-09-22 量过：四周连排说 5 真 6、八周说 9 真 10，
+  // 连「两周 + 目录」都是说 3 真 4（`.preview/summary_gap_probe.py`）。代价：一次
+  // `updateSummary()` 从 ~2ms 变成下面那个数（探针试排，无 `fit()`、不铺 DOM），
+  // 落在下拉框与分段按钮的 change 上，量不出手感差异。
+  //
+  // 唯一还量不到的是**配平**：`minFit` / `spillPages` 要 `fit()`，而 `fit()` 要真 DOM。
+  // 这两格必须**当场清掉**，否则上一次 build() 留下的读数会赖在摘要里，跟着旋钮一起骗人
+  // （实测：先铺一本 6 张的密册配平 73%，再开对话框拧周数，那句「配平 73%」一字不动地
+  // 跟着换册子）。丢周与超限那两格现在由 `planPapers()` 自己按这一册重算。
   updateSummary() {
     const base = Object.assign(this.defaultCfg(), this.readForm());
-    const clamped = this.clampCount(base.count, base.mode);
-    base.count = clamped.count;
-    this.capped = clamped.capped;
-    const plan = this.plan(base);
+    const plan = this.planPapers(base).plan;
+    this.minFit = null; this.spillPages = 0;
     const el = document.getElementById('sh-summary');
     // 缩减提示只说一次：summaryText 里那句对预览条同样适用，这里靠颜色标出来
     el.innerHTML = this.summaryText(plan, true);
-    el.classList.toggle('is-capped', !!this.capped);
+    el.classList.toggle('is-capped', !!(this.capped || this.trimmed || this.overCap));
   },
 
   bind() {
@@ -2664,8 +3247,12 @@ const SheetSet = {
     // 有人直接按 Cmd+P 绕过晒图按钮：堆栈还没铺就先铺一张本周，
     // 别让打印机出一叠白纸。
     window.addEventListener('beforeprint', () => {
-      if (!document.getElementById('print-stack').children.length) this.build();
-      else this.fit();
+      if (!document.getElementById('print-stack').children.length) { this.build(); return; }
+      // 已经有纸面：光重新配平一次不够。字体后落地、窗口变宽导致换行、或者用户在
+      // 预览里改过任务，都可能让某张纸高出 1586px 的下限预算 —— 这时压到 66% 只是
+      // 把墨迹硬塞回纸面，出纸机照旧多吐一张没图签的续页。该重排一次册，
+      // 让它正式多一张纸（跟 preview() 里那条 fonts.ready 是同一个道理）。
+      if (this.fit().spill) this.build();
     });
     window.addEventListener('resize', () => {
       if (document.body.classList.contains('sheet-preview')) this.viewFit();
