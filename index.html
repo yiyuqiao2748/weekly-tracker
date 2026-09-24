@@ -494,8 +494,15 @@ button.chip.rev:hover { background: var(--blueprint-soft); }
   border: 1px solid currentColor;
 }
 .status-badge[data-status="进行中"] { color: var(--blueprint); }
+/* 半填那一格 = 下边框加粗到 4px，**不是一条渐变**。
+   渐变会被 WebKit 光栅化成 Type-1 平铺瓦片（1×5、1×6 的小图）来铺，瓦片样本走色彩管理，
+   同一张纸两次出图会在 ±1 通道上翻脸 —— 第十八轮量到骰子、第十九轮对上号就是这一格
+   （纸面上那些逐袋变脸的像素 100% 落在这些瓦片里）。边框是矢量：闭包里一个栅格载荷都不留。
+   代价量过了（`.preview/probe_r19_badge_ab.py`）：1:1、2:1、4:1 与原来**逐像素同一枚**；
+   只有分数缩放（出纸 fit() 那一遍 ≈0.9836）边界那一格改成补墨，墨量 +5%、实心多 11 px，
+   也就是半填的下沿在纸上更硬一点。守住这件事的判据：`.preview/r19_payload_table.py`。 */
 .status-badge[data-status="进行中"]::before {
-  background: linear-gradient(to top, var(--blueprint) 50%, transparent 50%);
+  border-bottom-width: 4px;
 }
 .status-badge[data-status="已完成"] { color: var(--sage); }
 .status-badge[data-status="已完成"]::before {
