@@ -3146,6 +3146,17 @@ const SheetSet = {
   // 图面一档最小是卡内徽标 `.task-card .chip` 8.5px，7.5 ÷ 8.5 = .8824。
   // **改任何一侧的最小字号都要回来重算这个比值** —— 它不是一个审美常数，是一条除法。
   COMFORT_FLOOR: .8824,
+  // 第十五轮：`fit()` 那一步除法用的是**窄版**（100% 宽）的自然高，画出来的却是**宽版**
+  // （100/fc% 宽）缩完的样子。图面里有会折行的东西时宽版比窄版矮 —— 那一步就白缩一截。
+  // 下面两格管这一截：**多小的余量不去追**、**最多追几步**。
+  // FIT_SLACK = 2px 不是审美常数，是一道「根本不打算碰」的闸：那一位向下截断本身只留
+  // 0.02–0.08px 的余量（1e-4 × 900px ≈ 0.09px），2px 已经把它连量具噪声一起挡在外面。
+  // 现量：打码种子上每一张被缩过的纸余量都 ≤ 0.08px，一格也进不去；换成会折行的那颗
+  // fixture（`name` 最长 76 字），62 张纸里也只有 1 张进得来，余量 50.88px
+  // （probe_r15_curve.py / probe_r15_headroom.py，2026-09-24）。
+  // FIT_TURNS 只是保险：从 fc 二分到 1，1e-4 那条判据自己会停（实测 12 步内），16 步罩得住。
+  FIT_SLACK: 2,
+  FIT_TURNS: 16,
   fit() {
     const H = this.A3_H;
     const stack = document.getElementById('print-stack');
@@ -3194,14 +3205,43 @@ const SheetSet = {
       let fc = 1;
       if (flow) {
         const keepFlex = flow.style.flex;
-        flow.style.flex = '0 0 auto';      // 摘掉 grow，量的才是图面内容的自然高
-        const f = flow.getBoundingClientRect().height / fv;
-        flow.style.flex = keepFlex;
+        // 量「图面在占位宽 = pct% 下的自然布局高」：三件还原一件不能少 —— `--fc` 摁回 1
+        // （:3183 那一行做的）、`tb` 的负 margin 清空（:3185）、`flex-grow` 摘掉。
+        // 少还原一样，量的就是上一遍缩放之后的版面，那正是函数头那句警告的反馈环。
+        const natural = pct => {
+          flow.style.flex = '0 0 auto';
+          flow.style.width = pct === 100 ? '' : pct + '%';
+          const h = flow.getBoundingClientRect().height / fv;
+          flow.style.flex = keepFlex;
+          return h;
+        };
+        const f = natural(100);
         const avail = (H - 1) - pad - frame;
         // 装不下的那张按 H−1 配平、并且**向下截断**到四位小数：
         // 四舍五入会把盒子顶到 1047.03px，而可印区只有 1046.9px —— 多出那零点
         // 三像素足以让出纸机多吐一张空白续页（2026-09-22 在续排用例上真出过）。
-        fc = f > avail ? Math.max(this.FIT_FLOOR, Math.floor(avail / f * 1e4) / 1e4) : 1;
+        if (f > avail) {
+          fc = Math.max(this.FIT_FLOOR, Math.floor(avail / f * 1e4) / 1e4);
+          // 第十五轮：上面那一步除的是**窄版**的高，而画出来的是 `100/fc%` 宽那一版缩完
+          // 的样子（:3208 那一写）。图面里有会折行的东西时，宽的那一版比窄的矮，于是这一遍
+          // 白缩一截 —— 白纸不会多一张、图签栏照样贴边线，全部落在「最后一张卡墨底 →
+          // 图签栏」那一条带里：现量正常纸 23.7px，被白缩的那张 74.58px（多出来的正是 50.88px）。
+          // 所以追它买的是观感（同一张纸上的字大 3.2%），不是页数。
+          // `D(s) = s × natural(100/s)` 对 s **不减**（摊得越窄越高），可行集是 `(0, s*]` 一段，
+          // 所以二分合法；那个「拿新高的倒数再乘一次」的**迭代**反而不合法 —— 它是反序映射，
+          // 实测在那张纸上弹成两循环 0.9572 ↔ 0.8970，而且第二值是**不可行**的（probe_r15_curve.py）。
+          // 起点 lo 可行（余量 > 0）、hi = 1 不可行（`D(1)` 就是上面那个 `f > avail`），不变量成立。
+          if (avail - fc * natural(100 / fc) > this.FIT_SLACK) {
+            let lo = fc, hi = 1;
+            for (let k = 0; k < this.FIT_TURNS && hi - lo > 1e-4; k++) {
+              const mid = (lo + hi) / 2;
+              if (mid * natural(100 / mid) <= avail) lo = mid; else hi = mid;
+              // lo = mid 而不是 lo = 截断(mid)：探针在这儿写过 `lo = trunc(mid)`，一旦区间
+              // 窄过 1e-4 那位就把 lo 摁回原地，30 步烧完也收敛不了（结果仍可行，只是白跑）。
+            }
+            fc = Math.max(this.FIT_FLOOR, Math.floor(lo * 1e4) / 1e4);   // 只在末尾截断
+          }
+        }
       }
       paper.style.setProperty('--fc', fc.toFixed(4));
       if (flow) {
