@@ -832,7 +832,23 @@ button.chip:focus-visible { outline-width: 1.5px; outline-offset: 1px; }
 .stat-legend span::before { content: ''; width: 7px; height: 7px; border: 1px solid currentColor; }
 .stat-legend .lg-not { color: var(--ink-3); }
 .stat-legend .lg-prog { color: var(--blueprint); }
-.stat-legend .lg-prog::before { background: linear-gradient(to top, currentColor 50%, transparent 50%); }
+/* 半填那一格 = 下边框加粗到 4px，**不是一条渐变**。与上面 `.status-badge[data-status="进行中"]::before`
+   （第十九轮）同一个病根、同一个写法：渐变会被 WebKit 光栅化成 Type-1 平铺瓦片来铺，瓦片里那几枚像素
+   是一枚真栅格，于是它跟着色彩管理每遍各掷。图例这一枚一直没掷，只因为它在**不吃配平**的那一格里
+   （决策 22）⇒ 设备格高恒为 5.0 整数 —— 那叫恰好安全，不叫安全，第二十轮因此把它登记成「骰子的栖息地」
+   并立了闸（决策 33）。今天把这枚也换成矢量：纸上带内层栅格的瓦片从 107 槽 / 24 枚半填细条
+   降到 83 槽 / 0 枚（同一份代码另一次 build 读 81 —— 槽数是 **build 级读数，不能当指纹**），
+   闭包里的栅格载荷 310 → 262 枚（`.preview/r21_census.py` 六袋对照）。
+   代价是**从纸上读的，不是从盒模型算的**（`.preview/r21_inkintegral.py`；算出来的那一版错了，
+   见 PROGRESS 陷阱 150）：方块在 288DPI 上占 28×28 个设备像素，改前改后**墨是同一枚** —— 墨积分
+   20.00 行当量 vs 20.00、α=0.5 那条边距底 15 行 vs 15、墨心距底 9 行 vs 9；变的只有那 4 行抗锯齿
+   斜坡（.06/.26/.74/.94）换成了一次硬切，也就是 24 页上那 20 列 × 4 行 = 1,920 个差像素
+   （现场框出来 x5488–5507、y478–481）。全袋差像素 27,175 = 纸面 0.0040%，其中 25,255 全在两页时钟
+   那句「数据截至」自己占的地方 ⇒ **版面一格没挪**。撑到 8px 才给得出「盒模型上」正好一半，那一档
+   量过并**否决**：每页差像素 4,517（24 页同数）、全袋 149,459 = 0.0219%（单页 56 倍），而且差额
+   100% 落在宽块上 —— 图例整块连它下面几行一起重排。守这件事的尺子：`.preview/r20_tile_habitat.py`
+   （禁令：纸上不许再有半填细条，不管设备格高整不整）。 */
+.stat-legend .lg-prog::before { border-bottom-width: 4px; }
 .stat-legend .lg-done { color: var(--sage); }
 .stat-legend .lg-done::before { background: currentColor; }
 
