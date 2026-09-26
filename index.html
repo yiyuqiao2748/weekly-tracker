@@ -2576,17 +2576,31 @@ const SheetSet = {
   // （都是纸内自然像素 —— 探针挂在 body 下、不在 #print-stack 里，--fv 传不进来，
   // 所以 --pvs 与 --fc 恒为 1，rect 不会被缩放骗掉）。
   // 「这一页能画到哪儿」= limit = 下限能吞下的自然高 − 最高那列最后一张卡以下的占位。
-  _sheetGeom(html, itemSel) {
+  // `unitSel` 给了就**按容器分段**（空容器也占一段），不给才按「parentElement 一变新开一段」。
+  // 这两条不是一回事，而且差出来的那一截是**卡**：2026-09-26 量到「某周的第一位对接人这一周
+  // 没任务」时 `.column-body` 有四枚、按 parentElement 攒出的 groups 只有三段（空列不产生
+  // item ⇒ 不占段），于是 `_paginate` 拿三段的 `take` 去切四列 —— 从这一格起全体错位，
+  // `take[3]` 是 undefined ⇒ `list.slice(cur, cur + undefined)` = `slice(x, NaN)` = 空，
+  // 最后一列的卡整列静默丢掉（实测 31 枚变 24 枚、纸上少了 7 条任务而图签栏一字不提）。
+  // 只在「这张纸需要续排」时才犯，所以平时看不见 —— 分页那一步必须与列**同数量**，
+  // 空列也要占一格，否则段的下标就不是列的下标。
+  _sheetGeom(html, itemSel, unitSel) {
     const page = this._probe(html);
     const pr = page.getBoundingClientRect();
     const k = pr.width / 1512 || 1;
     const bottom = el => (el.getBoundingClientRect().bottom - pr.top) / k;
     const groups = [];
-    let lastParent = null;
-    page.querySelectorAll(itemSel).forEach(el => {
-      if (el.parentElement !== lastParent) { lastParent = el.parentElement; groups.push([]); }
-      groups[groups.length - 1].push(bottom(el));
-    });
+    if (unitSel) {
+      page.querySelectorAll(unitSel).forEach(u => {
+        groups.push([...u.querySelectorAll(itemSel)].map(bottom));
+      });
+    } else {
+      let lastParent = null;
+      page.querySelectorAll(itemSel).forEach(el => {
+        if (el.parentElement !== lastParent) { lastParent = el.parentElement; groups.push([]); }
+        groups[groups.length - 1].push(bottom(el));
+      });
+    }
     // tail = 「最高那一列的最后一张卡底边以下」占掉多少 —— 列框自己的下内边距、
     // 图签栏的下边距与整条图签栏、纸的下内边距都在里面。
     // 注意别拿图面块(block)的底边来算：图框是带内边距的，block 底边比最后一张卡的
@@ -2664,7 +2678,9 @@ const SheetSet = {
       if (s.kind === 'week') {
         const cols = C.MEMBERS.map(p => this.tasksFor(s.week, p, cfg));
         const g = this._sheetGeom(this._weekSheet(s, plan, cfg, Object.assign({ cols }, draft)),
-          '.sheet-board .column-body > .task-card');
+          // 第三个参数把「段」钉到容器上：`cols` 是 `C.MEMBERS.map(...)` 恒四列，
+          // `_sliceGroups` 的 `take` 必须也恒四格，否则段的下标对不上列的下标（见上）。
+          '.sheet-board .column-body > .task-card', '.sheet-board .column-body');
         if (g.h <= g.budget) { papers.push({ kind: 'week', sheet: s, cols }); return; }
         const cur = cols.map(() => 0);
         this._sliceGroups(g.groups, g.limit).forEach(take => {
