@@ -2412,6 +2412,9 @@ const SheetSet = {
   MAX_PAGES: 16,
   CODE: 'WTP',
   cfg: null,
+  // 「这次排纸受没受上限约束」的那份事实（`_capOf` 造的），由 `planPapers` 每一册重算一次。
+  // 屏上的摘要与纸上的目录页都从它取字，谁也不许自己再数一遍丢了几周。
+  cap: null,
 
   defaultCfg() {
     return { from: DataModel.state.currentWeek, count: 1, mode: 'weeks', scope: 'all', toc: true };
@@ -2652,8 +2655,29 @@ const SheetSet = {
     return ranges;
   },
 
+  // 试排目录页要用的那份「有几卷」：卷数的真话要到 `_paginate` **末尾**（铺完纸、每张纸有了
+  // `pos` 与张数）才说得出，可目录页的**量高**在开头就要 —— 于是「按人成册且不止一卷」
+  // 那两道闸（`_tocSheet` 里的卷小计行与那句「本卷 k / m」）在试排时全是 false，
+  // 量到的那一版比铺进真册的那一版矮 4 行小计 + 1 行说明。
+  // 2026-09-26 实测（`.preview/verify_r29_cap_on_paper.py` 的 E9 与 `/tmp/r29/where_64.py`）：
+  // 4 人 3 周那一册切点少算 64.50 px、真册比试排高 84.6 px —— 与下面「不预留就白续一页」
+  // 是同一族缺陷，只是这一格漏在目录页自己身上。当前上限下它还没咬人
+  // （真册目录页内容底边 910.25 仍在纸高 1047 内，目录页从没被切开），但上限一抬高就会。
+  // 这里只填**闸要读的两样**（卷数、人名）；张数与张次填成「两位数」那一档，
+  // 让预留出来的宽度不小于真册可能出现的宽度（那一行是单行 `<th colspan=8>`，只宽不高）。
+  _volsForProbe(plan, cfg) {
+    if (cfg.mode !== 'persons') return [];
+    const seen = [];
+    plan.sheets.forEach(s => {
+      if (s.kind === 'person' && s.person && seen.indexOf(s.person) < 0) seen.push(s.person);
+    });
+    return seen.map(person => ({ person, papers: 10, first: 1, last: 2, probe: true }));
+  },
+
   // 排一次册：逻辑页 → 物理纸张。每张纸带 pos（装订位置）、cont/conts（本图第几页）。
   _paginate(plan, cfg) {
+    // 先把试排要用的那份卷数垫上（见 `_volsForProbe`），下面算出真卷数时整份覆盖。
+    plan.volumes = this._volsForProbe(plan, cfg);
     const papers = [];
     if (plan.withToc) {
       const idx = plan.sheets.map((s, i) => i);
@@ -3036,8 +3060,10 @@ const SheetSet = {
     const order = cfg.mode === 'persons'
       ? '按人成册，每人一卷（VOL），卷内按周从旧到新；当周没有排任务的人不出空卷。' + volNote
       : '按周连排，一人一张分图（四人四张），排空的周也保留一张，作为「本周没排」的证据。';
+    const capLine = this.capNote();
     const note = `<div class="toc-note">本册 ${plan.weeks.length} 周（${esc(this.weekLabel(plan.first))} 至 ${esc(this.weekLabel(plan.last))}），`
       + `共 ${plan.total} 张 A3 横排（含本页，本页是第 01 张），收录范围：${esc(scope)}。${esc(order)}<br>`
+      + (capLine ? capLine + `<br>` : '')
       + `合计 ${total} 项、已完成 ${done} 项；同一条任务在相邻两周各记一次，按周分别计数。${stuckNote}<br>`
       + `数据截至 ${esc(new Date().toLocaleString('zh-CN', { hour12: false }))}，来源为云端 Gist 与本机缓存合并后的结果。</div>`;
     const meta = this._mark({
@@ -3112,6 +3138,12 @@ const SheetSet = {
     this.trimmed = null; this.overCap = 0;
     for (;;) {
       plan = this.plan(Object.assign({}, base, { count }));
+      // 上限那笔账必须在**试排之前**就定好：目录页要印「你要几周、纸上是几周、没排的那几周
+      // 叫什么」，而 `_paginate` 量的正是这一版目录页的高度 —— 探针少一句、真册多一句，
+      // 差出来那二十来像素就是「白续一张」（同上面预留「本图 n/m」那格的道理）。
+      // 句子只认 `(want, used, dropped)` 这三样，每一圈都齐，所以探针与真册读到同一串字；
+      // `kind` / `over` 要等这一圈的纸张数才知道，只给屏上那行摘要用，不进纸。
+      this.cap = this._capOf(base, clamped, count);
       if (!plan.sheets.length) { papers = []; break; }
       papers = this._paginate(plan, base);
       if (papers.length <= this.MAX_PAGES || count <= 1) break;
@@ -3131,7 +3163,52 @@ const SheetSet = {
     // 目录页与续页各自占一张纸，都进分母；张数从这一行起就是**纸**不是**页**。
     // 空册那一路 papers 是空的，`plan.total` 留给 `plan()` 算出来的 0，占位页不进摘要。
     if (papers.length) plan.total = papers.length;
+    // 结算：`kind` / `over` 要等这一圈的纸张数才知道，所以只有屏上那行摘要认它们；
+    // 纸上那一句用的 `want / used / dropped` 与循环里那一版逐字相同（见上面那段）。
+    this.cap = this._capOf(base, clamped, count);
+    this.cap.over = this.overCap;
+    this.cap.kind = this.overCap ? 'over'
+      : (this.trimmed ? (clamped.capped ? 'both' : 'loop')
+                      : (clamped.capped ? 'clamp' : 'none'));
     return { plan, papers, count };
+  },
+
+  // 「上限碰过这一册吗、碰掉了哪几周」的**唯一一份事实**。屏上的摘要与纸上的目录页都从这儿
+  // 取字：同一件事一旦有两套算法，两套就会各自说谎（决策 15 那条老规矩，摘要那三句假话
+  // 就是这么来的）。`dropped` 存的是**没印到纸上的那几个周键**，旧→新 —— 读图的人手里只有纸，
+  // 他要知道的是「缺的是哪几周」，不是「哪一道闸压的」，所以名字比分支更要紧。
+  _capOf(base, clamped, count) {
+    const dropped = count < base.count
+      ? this.weeks({ from: base.from, count: base.count }).slice(0, base.count - count) : [];
+    return {
+      want: base.count, used: count, dropped,
+      clampWeeks: base.count - clamped.count, loopWeeks: clamped.count - count,
+      over: 0, kind: 'none',
+    };
+  },
+
+  // 纸上那句「为什么比你选的少几周」。没丢周就是空串 —— 日常那一册纸面一个字都不多（这条
+  // 「零影响」由 `.preview/verify_r29_cap_on_paper.py` 的对照用例钉着）。
+  // 两道闸的**数**都印出来（`MAX_COUNT` / `MAX_PAGES` 现取，不写死字面），但**不点哪一道**压的：
+  // 这句在试排之前就要定字（见 `planPapers` 里那段），而「续排顶破的还是逻辑页顶破的」
+  // 要等这一圈铺完纸才知道 —— 屏上那行摘要认得出，它是在结算之后才拼的。
+  // 返回**已转义**的片段（周名走 `esc`），与 `_tocSheet` 里那几段同一口径。
+  capNote() {
+    const c = this.cap;
+    if (!c || !c.dropped.length) return '';
+    const d = c.dropped, n = d.length;
+    const short = w => {
+      const p = WeekUtils.parseWeekStr(w);
+      return p ? 'W' + String(p.week).padStart(2, '0') : w;
+    };
+    // 缺的那几周同年就写「W32 至 W35」，跨年写全名 —— 纸上第一行已经有全名，
+    // 这里要的是短而不断句；跨年了还写短名就是把两个年份塞进一个区间。
+    const sameYear = /^(\d{4})/.exec(d[0])[1] === /^(\d{4})/.exec(d[n - 1])[1];
+    const names = n === 1 ? esc(this.weekLabel(d[0]))
+      : sameYear ? `${short(d[0])} 至 ${short(d[n - 1])}`
+                 : `${esc(this.weekLabel(d[0]))} 至 ${esc(this.weekLabel(d[n - 1]))}`;
+    return `本次请求 ${c.want} 周，纸上是 ${c.used} 周 —— 出图上限（一次最多 ${this.MAX_COUNT} 周、`
+      + `每册最多 ${this.MAX_PAGES} 张）没容下最旧的 ${n} 周（${names}）；要 ${c.want} 周齐全，请分两册出。`;
   },
 
   build(cfg) {
@@ -3373,17 +3450,24 @@ const SheetSet = {
     if (cfg.mode === 'persons') bits.push('按人成册');
     if (cfg.scope === 'open') bits.push('只出未完成');
     if (cfg.scope === 'filtered') bits.push('沿用当前筛选');
-    if (this.capped && !this.trimmed) bits.push(`周数已压到 ${cfg.count}（上限 ${this.MAX_PAGES} 张）`);
+    // 三句的**字面**一字未改（`.preview/cap_papers.py` 逐字钉着它们），换的只是数的来路：
+    // 统统从 `this.cap` 取 —— 与目录页纸上那句是同一次读数。原来的 `total > weeks` 判的是
+    // 「clampCount 那道闸也出手了吗」，它与 `kind === 'both'` 等价（want − used > clampused − used
+    // ⟺ want > clamped.count ⟺ capped），所以换成认 kind 不动字面。
+    const cap = this.cap || { kind: 'none', dropped: [], used: cfg.count, over: this.overCap };
+    if (cap.kind === 'clamp') bits.push(`周数已压到 ${cap.used}（上限 ${this.MAX_PAGES} 张）`);
     // 续排把物理纸张顶过上限：丢的是最旧的周，说清楚丢了几个、实排几个。
     // 与上面那句**互斥**：两处压周各报各的数会打脸（「压到 1」＋「丢掉 1 周」，
     // 那个 1 到底指谁）。合起来说过一次，就把续排顶出来的那一截单独标出来。
-    if (this.trimmed) {
-      const total = this.trimmed.want - cfg.count;
-      bits.push(total > this.trimmed.weeks
-        ? `上限 ${this.MAX_PAGES} 张 · 从最旧的周起丢掉 ${total} 周（其中续排顶出 ${this.trimmed.weeks} 周），实排 ${cfg.count} 周`
-        : `续排后超出上限 ${this.trimmed.over} 张 · 从最旧的周起丢掉 ${this.trimmed.weeks} 周，实排 ${cfg.count} 周`);
+    if (cap.kind === 'both') {
+      bits.push(`上限 ${this.MAX_PAGES} 张 · 从最旧的周起丢掉 ${cap.dropped.length} 周`
+        + `（其中续排顶出 ${this.trimmed.weeks} 周），实排 ${cap.used} 周`);
     }
-    if (this.overCap) bits.push(`已超上限 ${this.overCap} 张（只剩一周，没有可丢的周）`);
+    if (cap.kind === 'loop') {
+      bits.push(`续排后超出上限 ${this.trimmed.over} 张 · 从最旧的周起丢掉 ${cap.dropped.length} 周，`
+        + `实排 ${cap.used} 周`);
+    }
+    if (cap.kind === 'over') bits.push(`已超上限 ${cap.over} 张（只剩一周，没有可丢的周）`);
     // 切开续排时要说清楚：「9 张」里有几张是被拆出来的，别让人以为排了 9 周
     const split = plan.sheets.filter(s => s.parts > 1);
     if (split.length) {
