@@ -1331,9 +1331,11 @@ const FilterState = {
 const GistSync = {
   CONFIG_KEY: 'renderTrackerSyncConfig',
   DEFAULT_GIST_ID: '1c847a7d6d0e61fb090eb581d5e988b7',
-  // SECURITY: TODO — 这个 token 不应硬编码在源码中，待迁移到用户输入方式。
-  // 当前仅限内部使用，切勿将此文件公开托管。
-  DEFAULT_TOKEN: 'ghp_' + 'Zhox7ql0pCmgMR03n93sNVclmUj9Up1I7Uwq',
+  // 全组共用的**默认**凭据：同事不填任何东西就能同步（⚙ 里填的优先于这一行，可按人覆盖）。
+  // 代价要写清楚：站点是公开托管的，这一行任何人 F12 都读得到；fine-grained token 的 Gists
+  // 权限**不能限定到单个 gist**，所以它一旦被人拿走，账要按「这个账号下所有 gist 可读写」计。
+  // 可疑或到期就到 GitHub 上吊销、换一枚进来 push。上一枚 `ghp_…` 已经失效（`/user` 401）。
+  DEFAULT_TOKEN: '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',
 
   loadConfig() {
     try {
