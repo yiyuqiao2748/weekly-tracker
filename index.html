@@ -1330,6 +1330,7 @@ const FilterState = {
 // ======================================================================
 const GistSync = {
   CONFIG_KEY: 'renderTrackerSyncConfig',
+  PENDING_KEY: 'renderTrackerSyncPending',
   DEFAULT_GIST_ID: '1c847a7d6d0e61fb090eb581d5e988b7',
   // 全组共用的**默认**凭据：同事不填任何东西就能同步（⚙ 里填的优先于这一行，可按人覆盖）。
   // 代价要写清楚：站点是公开托管的，这一行任何人 F12 都读得到；fine-grained token 的 Gists
@@ -1352,6 +1353,23 @@ const GistSync = {
 
   saveConfig(cfg) {
     localStorage.setItem(this.CONFIG_KEY, JSON.stringify(cfg));
+  },
+
+  // 「本地记下了、云端没确认」这件事必须活过标签页被关掉：pagehide 那发 keepalive 拿不到
+  // 结果（页面正在卸载，什么 UI 都碰不上），所以这里只记「欠一次确认」，下次开页由状态灯说。
+  markPending() {
+    if (!this.isConfigured()) return;
+    try {
+      const p = this.readPending() || { edits: 0, since: new Date().toISOString() };
+      p.edits += 1;
+      localStorage.setItem(this.PENDING_KEY, JSON.stringify(p));
+    } catch (e) { /* 存不下就不存：这一格不该把改动本身挡住 */ }
+  },
+  clearPending() {
+    try { localStorage.removeItem(this.PENDING_KEY); } catch (e) {}
+  },
+  readPending() {
+    try { return JSON.parse(localStorage.getItem(this.PENDING_KEY)) || null; } catch (e) { return null; }
   },
 
   // 用户自己在设置里填过的那份；没填就是空对象。
@@ -1438,6 +1456,7 @@ const GistSync = {
         throw new Error(`HTTP ${resp.status}`);
       }
       this.lastError = null;
+      this.clearPending();
       return true;
     } catch (e) {
       if (!this.lastError) this.lastError = 'network';
@@ -1486,6 +1505,7 @@ const GistSync = {
   pushDebounced(state) {
     if (!this.isConfigured()) return;
     clearTimeout(this._pushTimer);
+    this.markPending();
     SaveBtn.setUnsaved();
     this._pushTimer = setTimeout(() => this._doPush(state), 3000);
   },
@@ -1494,6 +1514,7 @@ const GistSync = {
   async saveNow(state) {
     if (!this.isConfigured()) return false;
     clearTimeout(this._pushTimer);
+    this.markPending();
     return await this._doPush(state);
   },
 
@@ -1578,11 +1599,14 @@ const SyncStatus = {
   set(state, text) {
     const el = document.getElementById('sync-status');
     const txt = document.getElementById('sync-text');
-    el.className = state;
-    if (state === 'configured') el.classList.add('configured');
+    // configured 是唯一让这一格 display:flex 的规则（基础规则 :581 是 display:none）——
+    // 早先这里写的是 el.className = state，把 configured 一起抹了，于是三档状态照样写进 DOM
+    // 却一格都渲染不出来：「同步中 / 已同步 / Token 已失效」全成了看不见的字。
+    el.className = 'configured ' + state;
     txt.textContent = text || '';
-    if (state === 'configured') {
-      // After synced, auto-fade to idle
+    if (state === 'synced') {
+      // 原来这一支判的是 state === 'configured'，但没有一个调用方传得到那个值 —— 死码。
+      // 「已同步」停两秒让位给灯，别让它长期霸着那一格。
       clearTimeout(this._timer);
       this._timer = setTimeout(() => { txt.textContent = ''; }, 2000);
     }
@@ -1743,7 +1767,14 @@ const Storage = {
     if (remote) {
       const merged = GistSync.merge(local, remote);
       this.save(merged);
-      SyncStatus.configured();
+      // 上次没确认上云的改动，这一次开页必须说出来 —— 不说，人就以为它已经在板子上。
+      const p = GistSync.readPending();
+      if (p) {
+        SyncStatus.error(`本地 ${p.edits} 次改动没确认传到云端 · 点击上传`);
+        SaveBtn.setUnsaved();
+      } else {
+        SyncStatus.configured();
+      }
       return merged;
     }
     SyncStatus.error('无法获取远程数据');
