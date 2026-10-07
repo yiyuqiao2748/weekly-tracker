@@ -1335,8 +1335,9 @@ const GistSync = {
   // 全组共用的**默认**凭据：同事不填任何东西就能同步（⚙ 里填的优先于这一行，可按人覆盖）。
   // 代价要写清楚：站点是公开托管的，这一行任何人 F12 都读得到；fine-grained token 的 Gists
   // 权限**不能限定到单个 gist**，所以它一旦被人拿走，账要按「这个账号下所有 gist 可读写」计。
-  // 可疑或到期就到 GitHub 上吊销、换一枚进来 push。上一枚 `ghp_…` 已经失效（`/user` 401）。
-  DEFAULT_TOKEN: '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',
+  // 可疑或到期就到 GitHub 上吊销、换一枚进来 push。已经两枚死在这一行上：`ghp_…` 是 `GET /user` 401，
+  // `github_pat_…`（2026-10-06 push 上线那枚）六小时后被 GitHub 标成 expired 并开了条 `Public leak` 告警。
+  DEFAULT_TOKEN: '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',
 
   loadConfig() {
     try {
